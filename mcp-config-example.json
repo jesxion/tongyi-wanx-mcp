@@ -4,7 +4,149 @@
       "command": "node",
       "args": ["/path/to/tongyi-wanx-mcp/dist/index.js"],
       "env": {
-        "DASHSCOPE_API_KEY": "your-api-key-here"
+        "DASHSCOPE_API_KEY": "your-dashscope-api-key-here",
+        "IMAGES_DIR": "./generated_images"
+      },
+      "description": "通义万相文生图MCP服务器 - 支持AI图像生成、本地存储和智能提示词优化"
+    }
+  },
+  "capabilities": {
+    "tools": [
+      {
+        "name": "text_to_image",
+        "description": "生成AI图像，支持多种模型和参数配置"
+      },
+      {
+        "name": "query_task", 
+        "description": "查询图像生成任务状态"
+      },
+      {
+        "name": "get_supported_models",
+        "description": "获取所有支持的图像生成模型"
+      }
+    ],
+    "prompts": [
+      {
+        "name": "optimize-prompt",
+        "description": "优化和扩展用户提示词，提升图像生成质量"
+      },
+      {
+        "name": "prompt-guide",
+        "description": "提供详细的提示词写作指南和技巧"
+      },
+      {
+        "name": "style-examples",
+        "description": "获取特定风格的示例提示词"
+      }
+    ],
+    "resources": [
+      {
+        "uri": "tongyi-wanx://images/*",
+        "description": "访问本地存储的生成图像文件"
+      }
+    ]
+  },
+  "metadata": {
+    "supportedModels": [
+      "wanx2.1-t2i-turbo",
+      "wanx2.1-t2i-plus",
+      "wanx2.0-t2i-turbo"
+    ],
+    "maxImageSize": "1440*1440",
+    "maxImagesPerRequest": 4,
+    "imageFormats": ["jpg", "png"],
+    "autoImageStorage": true,
+    "mcpResourcesEnabled": true,
+    "version": "1.0.0"
+  },
+  "configurationExamples": {
+    "claude-desktop": {
+      "description": "Claude Desktop MCP配置示例",
+      "configPath": "~/Library/Application Support/Claude/claude_desktop_config.json (macOS)",
+      "example": {
+        "mcpServers": {
+          "tongyi-wanx": {
+            "command": "node",
+            "args": ["/absolute/path/to/tongyi-wanx-mcp/dist/index.js"],
+            "env": {
+              "DASHSCOPE_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "IMAGES_DIR": "./generated_images"
+            }
+          }
+        }
+      }
+    },
+    "development": {
+      "description": "开发环境配置示例",
+      "example": {
+        "mcpServers": {
+          "tongyi-wanx": {
+            "command": "npm",
+            "args": ["run", "dev"],
+            "cwd": "/path/to/tongyi-wanx-mcp",
+            "env": {
+              "DASHSCOPE_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "IMAGES_DIR": "./dev_images",
+              "DEBUG": "1"
+            }
+          }
+        }
+      }
+    },
+    "production": {
+      "description": "生产环境配置示例",
+      "example": {
+        "mcpServers": {
+          "tongyi-wanx": {
+            "command": "node",
+            "args": ["/opt/tongyi-wanx-mcp/dist/index.js"],
+            "env": {
+              "DASHSCOPE_API_KEY": "${DASHSCOPE_API_KEY}",
+              "IMAGES_DIR": "/var/lib/tongyi-wanx/images",
+              "NODE_ENV": "production"
+            }
+          }
+        }
+      }
+    }
+  },
+  "setupInstructions": {
+    "prerequisites": [
+      "Node.js 18+ 已安装",
+      "从阿里云百炼平台获取API密钥: https://bailian.console.aliyun.com/"
+    ],
+    "installation": [
+      "1. 克隆项目: git clone https://github.com/your-username/tongyi-wanx-mcp.git",
+      "2. 安装依赖: cd tongyi-wanx-mcp && npm install", 
+      "3. 编译项目: npm run build",
+      "4. 配置环境变量: export DASHSCOPE_API_KEY='your-api-key'",
+      "5. 测试运行: npm run test-basic"
+    ],
+    "mcpClientConfiguration": [
+      "1. 根据您的MCP客户端选择对应的配置示例",
+      "2. 更新配置文件中的绝对路径和API密钥", 
+      "3. 将配置添加到您的MCP客户端配置文件中",
+      "4. 重启MCP客户端以加载服务器",
+      "5. 验证服务器是否正常工作"
+    ]
+  },
+  "troubleshooting": {
+    "commonIssues": {
+      "apiKeyError": {
+        "error": "请设置 DASHSCOPE_API_KEY 环境变量",
+        "solution": "确保已正确设置API密钥环境变量，检查密钥格式是否正确"
+      },
+      "imageGenerationFail": {
+        "error": "图像生成失败", 
+        "solution": "检查提示词是否包含敏感内容；验证API密钥额度是否充足"
+      },
+      "taskPending": {
+        "error": "任务状态一直是 PENDING",
+        "solution": "服务可能繁忙，稍等片刻或使用 query_task 查询状态"
+      },
+      "storageError": {
+        "error": "图像存储失败",
+        "solution": "检查IMAGES_DIR目录权限，确保目录存在且可写"
       }
     }
   }

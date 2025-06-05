@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  tongyi-wanx-mcp:
+    build: .
+    container_name: tongyi-wanx-mcp
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - IMAGES_DIR=/app/generated_images
+      - NODE_ENV=production
+    volumes:
+      - ./generated_images:/app/generated_images
+    restart: unless-stopped
+    # 如果需要网络访问，可以取消注释以下行
+    # ports:
+    #   - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
