@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tongyi-wanx": {
+      "command": "node",
+      "args": ["/path/to/tongyi-wanx-mcp/dist/index.js"],
+      "env": {
+        "DASHSCOPE_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
