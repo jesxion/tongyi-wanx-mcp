@@ -1,0 +1,48 @@
+{
+  "name": "tongyi-wanx-mcp",
+  "version": "2.0.0",
+  "description": "通义万相文生图 MCP 服务器 - 支持AI图像生成、本地存储和智能提示词优化",
+  "main": "dist/index.js",
+  "type": "module",
+  "author": "Jesxion <jesxion@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jesxion/tongyi-wanx-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jesxion/tongyi-wanx-mcp/issues"
+  },
+  "homepage": "https://github.com/jesxion/tongyi-wanx-mcp#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol", 
+    "tongyi",
+    "wanx",
+    "ai",
+    "image-generation",
+    "text-to-image",
+    "alibaba",
+    "dashscope"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js", 
+    "dev": "tsx src/index.ts",
+    "test": "npm run build && node test.js",
+    "test:watch": "npm run build && npm run test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.2",
+    "tsx": "^4.16.5",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
