@@ -1,11 +1,12 @@
-# 通义万相 MCP 服务器
+# 通义万相 MCP 服务器 v2.3.0
 
-一个高性能、模块化的 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 通义万相文生图服务器，提供企业级的AI图像生成和智能提示词优化功能。
+一个功能全面的 Model Context Protocol (MCP) 服务器，为 Claude Desktop 等 MCP 客户端提供强大的 AI 图像生成和编辑功能。基于阿里云通义万相模型，支持文本生成图像、图像编辑、智能提示词优化、OSS 云存储等核心功能。
 
-## ✨ 功能特性
+## ✨ 核心特性
 
-### 🎨 强大的图像生成能力
-- **多模型支持**: 支持 wanx2.1-t2i-turbo、wanx2.1-t2i-plus、wanx2.0-t2i-turbo
+### 🎯 完整的图像生成功能
+- **文本生成图像**: 支持 wanx2.1 系列最新模型，包括 turbo 和 plus 版本
+- **图像编辑**: 10种专业图像编辑功能，包括风格化、局部重绘、扩图、超分等
 - **中英文提示词**: 完全支持中文和英文描述，智能提示词扩展
 - **灵活参数控制**: 自定义图像尺寸、数量、种子值、负向提示词等
 - **异步任务处理**: 支持长时间任务的状态查询和管理
@@ -18,22 +19,27 @@
 - **丰富示例**: 提供大量实用的提示词模板和最佳实践
 
 ### 🏗️ 企业级架构设计
-- **模块化设计**: 7个专门模块，职责清晰，易于维护和扩展
+- **模块化设计**: 9个专门模块，职责清晰，易于维护和扩展
 - **并发控制**: 智能请求队列，防止API限制，支持最大2个并发请求
 - **错误恢复**: 指数退避重试机制，自动处理临时故障
 - **性能监控**: 详细的性能指标和API调用统计
 - **优雅关闭**: 完善的资源清理和服务关闭流程
 
-### 💾 智能存储管理
-- **本地图片存储**: 自动下载并本地保存生成的图片
+### 💾 智能存储管理 (v2.3.0 新特性)
+- **条件本地存储**: 仅在配置 IMAGES_DIR 时启用本地存储，灵活适应不同部署需求
+- **阿里云 OSS 集成**: 可选的云端存储，提供永久访问链接和自动日志上传
+- **智能 URL 选择**: 优先使用 OSS URL，自动回退到本地路径
+- **用户图片上传**: 支持上传本地图片到 OSS 获取公网 URL
+- **OSS 状态管理**: 修复图片 OSS 状态，批量管理云端资源
 - **元数据持久化**: JSON格式存储图片信息，支持搜索和统计
 - **自动清理**: 7天后自动清理过期图片，节省存储空间
-- **存储统计**: 实时显示存储使用情况和模型分布
+- **存储统计**: 实时显示存储使用情况、OSS 状态和模型分布
 
 ### 🛡️ 可靠性保障
 - **测试模式**: 无需API密钥即可测试所有功能
 - **类型安全**: 完整的TypeScript类型定义
 - **配置验证**: 启动时自动验证配置有效性
+- **OSS 日志系统**: 自动缓冲并上传日志到云端（50条缓冲，5分钟自动上传）
 - **详细日志**: 分级日志系统，便于问题诊断
 
 ## 🚀 快速开始
@@ -58,40 +64,40 @@ npm install
 
 ### 3. 配置环境变量
 
+复制示例配置文件：
+```bash
+cp .env.example .env
+```
+
 #### 必需的环境变量
 
-**图片存储目录（必需）:**
-```powershell
-# Windows (PowerShell)
-$env:IMAGES_DIR="C:\path\to\your\images\directory"
+**图片存储目录（推荐配置）:**
+```bash
+# Windows
+IMAGES_DIR=C:\path\to\your\images\directory
 
 # Linux/Mac
-export IMAGES_DIR="/path/to/your/images/directory"
+IMAGES_DIR=/path/to/your/images/directory
 ```
 
 #### 可选的环境变量
 
 **API密钥（生产环境推荐）:**
-如果要使用真实的图像生成功能，需要配置API密钥：
-
 1. 访问 [阿里云百炼平台](https://bailian.console.aliyun.com/)
 2. 创建应用并获取 API Key
-3. 设置环境变量：
+3. 在 .env 文件中配置：
 
-**Windows (PowerShell):**
-```powershell
-$env:DASHSCOPE_API_KEY="your-api-key-here"
-```
-
-**Linux/Mac:**
-```bash
-export DASHSCOPE_API_KEY="your-api-key-here"
-```
-
-**或者创建 `.env` 文件:**
 ```env
-IMAGES_DIR=./your-images-directory
 DASHSCOPE_API_KEY=your-api-key-here
+```
+
+**阿里云 OSS 配置（可选，启用云存储功能）:**
+```env
+OSS_ENABLE=true
+OSS_ACCESS_KEY_ID=your-oss-access-key-id
+OSS_ACCESS_KEY_SECRET=your-oss-access-key-secret
+OSS_REGION=oss-cn-hangzhou
+OSS_BUCKET=your-bucket-name
 ```
 
 ### 4. 编译和运行
@@ -121,20 +127,21 @@ npm test
 ```
 tongyi-wanx-mcp/
 ├── src/                    # 源代码目录
-│   ├── index.ts           # 主服务器文件
-│   ├── config.ts          # 配置管理模块
-│   ├── logger.ts          # 日志系统模块
-│   ├── errors.ts          # 错误处理模块
-│   ├── concurrency.ts     # 并发控制模块
-│   ├── image-storage.ts   # 图片存储模块
-│   └── tongyi-service.ts  # 通义万相服务模块
+│   ├── index.ts           # 主服务器文件 - MCP协议处理
+│   ├── config.ts          # 配置管理模块 - 环境变量验证
+│   ├── logger.ts          # 日志系统模块 - 支持OSS上传
+│   ├── errors.ts          # 错误处理模块 - 自定义错误类型
+│   ├── concurrency.ts     # 并发控制模块 - 请求队列管理
+│   ├── image-storage.ts   # 图片存储模块 - 支持条件本地存储
+│   ├── oss-service.ts     # OSS服务模块 - 阿里云存储集成
+│   ├── prompt-guides.ts   # 提示词指南模块 - 智能优化系统
+│   └── tongyi-service.ts  # 通义万相服务模块 - API封装
 ├── dist/                  # 编译输出目录
-├── generated_images/      # 生成图片存储目录
-├── test_images/          # 测试图片存储目录
-├── OPTIMIZATION.md        # 优化文档
-├── CLEANUP-SUMMARY.md     # 清理总结
-├── test.js               # 测试脚本
-└── package.json          # 项目配置
+├── generated_images/      # 生成图片存储目录（可选）
+├── .env.example          # 环境变量配置示例
+├── package.json          # 项目配置
+└── tsconfig.json         # TypeScript配置
+```
 
 ## 🛠️ 可用工具
 
@@ -159,18 +166,34 @@ tongyi-wanx-mcp/
 - `watermark`: 添加AI水印 (默认: false)
 - `wait_for_completion`: 等待完成 (默认: true)
 
-**示例：**
-```json
-{
-  "model": "wanx2.1-t2i-plus",
-  "prompt": "一只可爱的橘猫，坐在窗台上，阳光洒在毛发上，温暖的色调，日系摄影风格，高质量，4K，精细细节",
-  "negative_prompt": "模糊，低质量，变形",
-  "size": "1024*1024",
-  "n": 2,
-  "prompt_extend": true,
-  "watermark": false
-}
-```
+#### image_edit
+使用通义万相进行图像编辑，支持10种编辑功能。
+
+**必需参数：**
+- `prompt`: 提示词，描述期望的编辑效果
+- `function`: 图像编辑功能类型
+- `base_image_url`: 基础图像的URL地址
+
+**支持的编辑功能：**
+1. **全局风格化** (`stylization_all`) - 整张图像风格迁移
+2. **局部风格化** (`stylization_local`) - 局部区域风格迁移（8种风格）
+3. **指令编辑** (`description_edit`) - 通过指令编辑图像
+4. **局部重绘** (`description_edit_with_mask`) - 精确区域编辑
+5. **去文字水印** (`remove_watermark`) - 去除文字和水印
+6. **扩图** (`expand`) - 四个方向按比例扩展
+7. **图像超分** (`super_resolution`) - 高清放大（1-4倍）
+8. **图像上色** (`colorization`) - 黑白图像转彩色
+9. **线稿生图** (`doodle`) - 基于线稿生成图像
+10. **人体重绘** (`person_generation`) - 人体图像生成
+
+**可选参数：**
+- `mask_image_url`: 遮罩图像URL（局部重绘需要）
+- `strength`: 图像修改幅度（0.0-1.0）
+- `upscale_factor`: 超分放大倍数（1-4）
+- `top_scale`, `bottom_scale`, `left_scale`, `right_scale`: 扩展比例（1.0-2.0）
+
+#### get_image_edit_functions
+获取所有图像编辑功能的详细说明和使用技巧。
 
 ### 任务管理工具
 
@@ -197,6 +220,7 @@ tongyi-wanx-mcp/
 - API密钥配置状态
 - 并发请求情况
 - 图片存储统计
+- OSS 服务状态
 
 #### get_image_stats
 获取详细的图片存储统计信息：
@@ -210,6 +234,48 @@ tongyi-wanx-mcp/
 
 **参数：**
 - `query` (必需): 搜索关键词，可匹配提示词或模型名称
+
+### 云存储管理工具 (OSS) - v2.3.0 新增
+
+#### upload_image_to_oss
+上传本地图片到阿里云 OSS 获取公网访问 URL。
+
+**参数：**
+- `image_path` (必需): 本地图片文件路径
+
+**返回：**
+- OSS 公网访问 URL
+- 本地文件路径  
+- OSS 对象名称
+
+#### repair_oss_status
+修复图片的 OSS 状态，将本地图片重新上传到 OSS。
+
+**参数：**
+- `image_id` (必需): 要修复的图片 ID
+
+**使用场景：**
+- 图片生成时 OSS 上传失败
+- OSS 配置更改后需要重新上传
+- 批量修复历史图片的 OSS 状态
+
+#### get_oss_status
+获取 OSS 服务状态和配置信息。
+
+**返回信息：**
+- OSS 功能启用状态
+- 配置完整性检查
+- 存储桶和区域信息
+- 访问密钥配置状态
+
+#### list_oss_images
+列出 OSS 中存储的图片资源。
+
+#### get_log_status
+获取日志系统状态信息，包括缓冲区状态和上传统计。
+
+#### flush_logs
+强制上传缓冲的日志到 OSS。
 
 ## 💡 智能提示词功能
 
@@ -257,24 +323,6 @@ style-examples-chinese-ink   # 国风水墨风格示例
 ... 等等
 ```
 
-### 使用方法
-
-通过MCP客户端调用提示词功能：
-
-```json
-{
-  "method": "prompts/get",
-  "params": {
-    "name": "optimize-prompt",
-    "arguments": {
-      "description": "夕阳下的城市",
-      "style": "废土风", 
-      "shot_type": "远景"
-    }
-  }
-}
-```
-
 ## 📚 提示词写作指南
 
 ### 基础公式
@@ -317,48 +365,98 @@ style-examples-chinese-ink   # 国风水墨风格示例
 - **远景 (Long Shot)**: 广阔视野，宏观场面
 - **鸟瞰 (Bird's Eye View)**: 俯视角度，全局视角
 
-#### 构图技巧
-- **三分法**: 黄金分割点构图
-- **对称构图**: 平衡稳定的视觉效果
-- **引导线**: 利用线条引导视线
-- **框架构图**: 利用环境元素形成画框
+### 图像编辑提示词技巧
 
-### 光线与氛围
+#### 风格化编辑
+```
+全局风格化：
+- "转换成法国绘本风格"
+- "转换成金箔艺术风格"
 
-#### 光线效果
-- **自然光**: 柔和真实，户外拍摄感
-- **逆光**: 轮廓分明，梦幻光环效果
-- **侧光**: 立体感强，戏剧性光影
-- **顶光**: 均匀照明，商业摄影风格
-- **氛围光**: 情感渲染，意境营造
+局部风格化：
+- "把房子变成木板风格"
+- "把衣服变成青花瓷风格"
+- "把头发变成云朵风格"
+```
 
-#### 时间与环境
-- **黄金时刻**: 日出日落，温暖色调
-- **蓝调时刻**: 日落后，冷色调氛围
-- **夜景**: 人工光源，霓虹灯效果
-- **室内**: 受控光线，温馨氛围
+#### 指令编辑
+```
+添加操作：
+- "添加一顶红色帽子"
+- "在背景中添加雪花"
 
-### 质量增强关键词
+修改操作：
+- "把女孩的头发修改为红色"
+- "把汽车的颜色改成蓝色"
 
-#### 画质词汇
-- `高质量`、`4K`、`8K`、`超高清`
-- `精细细节`、`锐利清晰`、`专业摄影`
-- `电影级`、`商业摄影`、`大师作品`
+移除操作：
+- "移除背景中的建筑物"
+- "去除图像中的文字"
+```
 
-#### 技术词汇
-- `景深`、`浅景深`、`长焦镜头`
-- `HDR`、`专业打光`、`工作室光线`
-- `后期处理`、`调色`、`电影色调`
+#### 扩图提示词
+```
+场景扩展：
+- "一位绿色仙子在森林中飞舞"
+- "扩展显示更多的海滩风景"
+- "展现完整的城市天际线"
+```
 
 ## 🔧 配置与环境
 
 ### 环境变量配置
-- `IMAGES_DIR`: 图片存储路径 (**必需**, 必须在 MCP host/client 端配置)
+
+#### 基础配置
+- `IMAGES_DIR`: 图片存储路径 (可选，不配置则不启用本地存储)
 - `DASHSCOPE_API_KEY`: 通义万相API密钥 (可选，测试模式无需)
 - `LOG_LEVEL`: 日志级别 (DEBUG, INFO, ERROR，默认: INFO)
 - `MAX_CONCURRENT_REQUESTS`: 最大并发请求数 (默认: 2)
 - `CLEANUP_INTERVAL_HOURS`: 清理间隔小时 (默认: 24)
 - `IMAGE_RETENTION_DAYS`: 图片保留天数 (默认: 7)
+
+#### 阿里云 OSS 配置 (可选)
+启用 OSS 功能可以将生成的图片自动上传到云端，获得永久访问链接，避免临时 URL 过期问题。
+
+**必需配置（启用 OSS 时）：**
+- `OSS_ENABLE`: 启用 OSS 功能 (true/false，默认: false)
+- `OSS_ACCESS_KEY_ID`: OSS 访问密钥 ID
+- `OSS_ACCESS_KEY_SECRET`: OSS 访问密钥 Secret
+- `OSS_REGION`: OSS 区域 (如: oss-cn-hangzhou)
+- `OSS_BUCKET`: OSS 存储桶名称
+
+**可选配置：**
+- `OSS_ENDPOINT`: 自定义 OSS 端点
+- `OSS_IMAGE_PREFIX`: 图片存储路径前缀 (默认: images/)
+- `OSS_LOG_PREFIX`: 日志存储路径前缀 (默认: logs/)
+
+💡 **OSS 功能优势**:
+- ✅ 永久访问链接，不会过期
+- ✅ 支持 CDN 加速，全球访问更快
+- ✅ 自动备份，数据更安全
+- ✅ 支持用户图片上传，便于图像编辑功能
+- ✅ 智能回退，OSS 不可用时自动使用本地存储
+- ✅ 自动日志上传，便于问题追踪
+
+### OSS 存储结构
+
+```
+your-bucket/
+├── images/
+│   ├── generated/          # 生成的图片
+│   ├── user-uploads/       # 用户上传的图片
+│   ├── downloaded/         # 从 URL 下载的图片
+│   └── repaired/          # 修复状态时重新上传的图片
+└── logs/                   # 系统日志文件
+    └── yyyy-mm-dd/        # 按日期分组的日志
+```
+
+### OSS 权限要求
+
+您的 OSS AccessKey 需要以下权限：
+- `oss:PutObject` - 上传文件
+- `oss:GetObject` - 获取文件 
+- `oss:DeleteObject` - 删除文件
+- `oss:ListObjects` - 列出文件
 
 ### 模型对比
 
@@ -378,20 +476,6 @@ style-examples-chinese-ink   # 国风水墨风格示例
 | 4:3 | 1024×768 | 传统照片比例 |
 | 3:4 | 768×1024 | 肖像照片 |
 
-### 性能优化配置
-
-#### 并发控制
-- **默认并发数**: 2个请求
-- **队列管理**: 自动排队等待
-- **超时设置**: 5分钟任务超时
-- **重试机制**: 指数退避重试
-
-#### 存储管理
-- **自动清理**: 每24小时清理一次
-- **图片压缩**: 自动优化存储空间
-- **元数据缓存**: JSON格式快速检索
-- **搜索索引**: 支持关键词搜索
-
 ## 📝 使用示例
 
 ### MCP客户端集成
@@ -407,7 +491,12 @@ style-examples-chinese-ink   # 国风水墨风格示例
       "args": ["C:/path/to/tongyi-wanx-mcp/dist/index.js"],
       "env": {
         "IMAGES_DIR": "C:/path/to/your/images/directory",
-        "DASHSCOPE_API_KEY": "your-api-key-here"
+        "DASHSCOPE_API_KEY": "your-api-key-here",
+        "OSS_ENABLE": "true",
+        "OSS_ACCESS_KEY_ID": "your-oss-access-key-id",
+        "OSS_ACCESS_KEY_SECRET": "your-oss-access-key-secret",
+        "OSS_REGION": "oss-cn-hangzhou",
+        "OSS_BUCKET": "your-bucket-name"
       }
     }
   }
@@ -431,106 +520,30 @@ style-examples-chinese-ink   # 国风水墨风格示例
 }
 ```
 
-#### 批量生成不同风格
+#### 图像编辑示例
 ```json
 {
   "method": "tools/call",
   "params": {
-    "name": "text_to_image", 
+    "name": "image_edit",
     "arguments": {
-      "prompt": "山水风景，古典建筑，中国风，国画风格，水墨画，意境深远，高质量",
-      "model": "wanx2.1-t2i-plus",
-      "size": "1024*576",
-      "n": 4,
-      "seed": 12345
+      "prompt": "把女孩的头发修改为红色",
+      "function": "description_edit",
+      "base_image_url": "https://your-image-url.jpg",
+      "strength": 0.7
     }
   }
 }
 ```
 
-### 提示词优化示例
-
-#### 优化简单描述
-```json
-{
-  "method": "prompts/get",
-  "params": {
-    "name": "optimize-prompt",
-    "arguments": {
-      "description": "夕阳下的城市",
-      "style": "写实",
-      "shot_type": "远景"
-    }
-  }
-}
-```
-
-**优化结果：**
-"现代化城市天际线，夕阳西下，金色阳光洒在高楼大厦上，玻璃幕墙反射温暖光线，写实摄影风格，远景拍摄，电影级构图，专业摄影，高质量，4K分辨率"
-
-#### 获取风格指南
-```json
-{
-  "method": "prompts/get",
-  "params": {
-    "name": "prompt-guide-styles"
-  }
-}
-```
-
-#### 获取特定风格示例
-```json
-{
-  "method": "prompts/get",
-  "params": {
-    "name": "style-examples-watercolor"
-  }
-}
-```
-
-### 服务监控示例
-
-#### 检查服务状态
+#### OSS 管理示例
 ```json
 {
   "method": "tools/call",
   "params": {
-    "name": "get_service_status"
-  }
-}
-```
-
-**返回示例：**
-```json
-{
-  "service_status": {
-    "isTestMode": false,
-    "hasApiKey": true,
-    "concurrencyStatus": {
-      "activeRequests": 1,
-      "maxConcurrent": 2,
-      "queueLength": 0
-    }
-  },
-  "image_storage": {
-    "totalImages": 156,
-    "totalSize": "2.3GB",
-    "modelDistribution": {
-      "wanx2.1-t2i-plus": 89,
-      "wanx2.1-t2i-turbo": 67
-    }
-  }
-}
-```
-
-#### 搜索历史图片
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "search_images",
+    "name": "upload_image_to_oss",
     "arguments": {
-      "query": "猫咪"
+      "image_path": "/path/to/local/image.jpg"
     }
   }
 }
@@ -570,79 +583,69 @@ style-examples-chinese-ink   # 国风水墨风格示例
 - `锐利清晰, 电影级, 商业摄影, 大师作品`
 - `专业打光, HDR, 后期处理`
 
-### 参数调优建议
+### 图像编辑最佳实践
 
-#### 模型选择策略
-```python
-# 快速迭代和测试
-model = "wanx2.1-t2i-turbo"
+#### 1. 风格化编辑
+```
+全局风格化：明确指定目标风格
+"转换成法国绘本风格" ✅
+"变成好看的风格" ❌
 
-# 高质量最终输出
-model = "wanx2.1-t2i-plus" 
-
-# 成本控制
-model = "wanx2.0-t2i-turbo"
+局部风格化：具体描述要修改的部分
+"把房子变成木板风格" ✅  
+"把东西变成其他风格" ❌
 ```
 
-#### 尺寸选择指南
-```python
-# 社交媒体头像
-size = "1024*1024"
-
-# 横屏壁纸/横幅
-size = "1024*576" 
-
-# 手机壁纸/竖屏内容
-size = "576*1024"
-
-# 印刷品/高分辨率需求
-size = "1440*1440"
+#### 2. 指令编辑
+```
+清晰的操作指令：
+"把女孩的头发修改为红色" ✅
+"添加一顶蓝色帽子" ✅
+"改变一些东西" ❌
 ```
 
-#### 种子值的艺术
-```python
-# 保持一致性 - 相同种子生成相似风格
-seed = 12345
+#### 3. 遮罩制作技巧
+- 白色区域：需要编辑的部分（RGB: 255,255,255）
+- 黑色区域：保持不变的部分（RGB: 0,0,0）
+- 边缘平滑：使用渐变过渡避免硬边
 
-# 探索变化 - 不同种子探索可能性
-seed = random.randint(1, 1000000)
+### 存储策略建议
 
-# 系列创作 - 递增种子保持风格一致性
-for i in range(10):
-    seed = base_seed + i
+#### 1. 本地存储 vs OSS 存储
+```
+仅本地存储：
+- 适用于个人使用、测试环境
+- 配置 IMAGES_DIR，不配置 OSS
+
+仅 OSS 存储：
+- 适用于生产环境、多用户场景
+- 不配置 IMAGES_DIR，配置 OSS
+
+混合存储：
+- 适用于逐步迁移、备份需求
+- 同时配置 IMAGES_DIR 和 OSS
 ```
 
-### 高级技巧
+#### 2. OSS 配置建议
+```
+开发环境：
+OSS_ENABLE=false  # 使用本地存储，节省成本
 
-#### 1. 提示词分层结构
-```
-主体层: "25岁中国女性，黑色长发，温柔笑容"
-场景层: "坐在咖啡厅窗边，温暖的下午阳光"
-风格层: "日系摄影风格，胶片质感，浅景深"
-技术层: "专业摄影，85mm镜头，f/1.4光圈"
-质量层: "高质量，4K分辨率，精细细节"
-```
+测试环境：
+OSS_ENABLE=true
+OSS_BUCKET=your-test-bucket  # 使用测试桶
 
-#### 2. 情感氛围营造
-```
-温馨: "温暖光线，柔和色调，舒适氛围"
-神秘: "昏暗光线，对比强烈，戏剧性"
-浪漫: "金色时刻，柔焦效果，梦幻光晕"
-力量: "强烈对比，锐利线条，动态构图"
+生产环境：
+OSS_ENABLE=true
+OSS_BUCKET=your-prod-bucket  # 使用生产桶
+OSS_ENDPOINT=your-cdn-domain  # 配置 CDN 加速
 ```
 
-#### 3. 风格融合技巧
-```
-"3D卡通风格 + 日系摄影美学"
-"水彩画效果 + 现代都市场景"  
-"国风水墨 + 科幻元素"
-"写实摄影 + 梦幻色彩"
-```
+## 🔧 故障排除
 
-### 故障排除指南
+### 常见问题解决
 
-#### 常见问题解决
-
+#### 图像生成问题
 **Q: 生成的图像与描述不符**
 A: 
 - 检查提示词是否足够具体
@@ -657,6 +660,22 @@ A:
 - 检查图像尺寸设置
 - 优化提示词结构
 
+#### 图像编辑问题
+**Q: 编辑效果不理想**
+A:
+- 调整 `strength` 参数（0.5-0.8 通常效果较好）
+- 使用更具体的编辑指令
+- 检查遮罩图像质量（如需要）
+- 尝试不同的编辑功能
+
+**Q: 局部重绘不精确**
+A:
+- 检查遮罩图像格式和质量
+- 确保遮罩边缘清晰
+- 使用渐变边缘避免硬切割
+- 调整编辑强度
+
+#### 服务器问题
 **Q: 任务生成失败**
 A:
 - 检查API密钥配置
@@ -671,174 +690,68 @@ A:
 - 使用更快的模型 `turbo` 版本
 - 减少生成图片数量
 
+#### OSS 相关问题
+**Q: OSS 上传失败**
+A:
+- 检查 OSS 配置是否正确
+- 验证 AccessKey 权限
+- 确认存储桶是否存在
+- 查看网络连接状态
+
+**Q: OSS 状态异常**
+A:
+- 使用 `get_oss_status` 检查配置
+- 使用 `repair_oss_status` 修复状态
+- 检查 OSS 服务可用性
+- 验证权限配置
+
 #### 测试模式使用
 无API密钥时的功能测试：
 ```bash
 # 启动测试模式
 npm test
 
-# 测试提示词优化
-# 测试风格指南获取
-# 测试服务状态查询
-# 测试工具列表
+# 测试功能包括：
+# - 提示词优化
+# - 风格指南获取  
+# - 服务状态查询
+# - 工具列表获取
 ```
 
-## 🚀 开发与扩展
+## 📊 版本更新历史
 
-### 项目架构
+### v2.3.0 (当前版本) - 2024年6月
+#### 新增功能
+- ✅ **条件本地存储**: 仅在配置 IMAGES_DIR 时启用本地存储
+- ✅ **OSS 云存储集成**: 完整的阿里云 OSS 支持，包括图片和日志存储
+- ✅ **6个新增 MCP 工具**: OSS 管理、日志管理、图片上传等
+- ✅ **OSS 日志系统**: 自动缓冲并上传日志到云端
+- ✅ **增强的资源发现**: 支持本地和 OSS 图片资源自动发现
+- ✅ **优雅关闭**: 异步清理日志和服务资源
 
-```
-src/
-├── index.ts              # 主服务器 - MCP协议处理
-├── config.ts             # 配置管理 - 环境变量验证
-├── logger.ts             # 日志系统 - 分级日志记录
-├── errors.ts             # 错误处理 - 自定义错误类型
-├── concurrency.ts        # 并发控制 - 请求队列管理
-├── image-storage.ts      # 图片存储 - 本地存储管理
-└── tongyi-service.ts     # 通义服务 - API封装
-```
+#### 优化改进
+- ✅ **存储策略优化**: 支持纯本地、纯OSS、混合存储三种模式
+- ✅ **错误处理增强**: OSS 操作失败时优雅降级
+- ✅ **性能优化**: 日志缓冲机制减少 OSS 请求频率
+- ✅ **向后兼容**: 完全兼容现有本地存储功能
 
-### 模块说明
+### v2.1.0 - 图像编辑功能
+- ✅ 新增 10种图像编辑功能
+- ✅ 支持风格化、局部重绘、扩图、超分等
+- ✅ 遮罩图像支持
+- ✅ 图像编辑参数优化
 
-#### 核心模块
-- **index.ts**: MCP服务器主入口，处理工具调用和提示词请求
-- **config.ts**: 配置管理，支持环境变量验证和测试模式
-- **tongyi-service.ts**: 通义万相API封装，支持异步任务处理
+### v2.0.0 - 企业级重构
+- ✅ 模块化架构设计
+- ✅ TypeScript 重写
+- ✅ 并发控制系统
+- ✅ 智能提示词系统
+- ✅ 本地图片存储
 
-#### 支持模块  
-- **logger.ts**: 结构化日志系统，支持性能监控
-- **errors.ts**: 统一错误处理，包含重试机制
-- **concurrency.ts**: 并发控制，防止API限制
-- **image-storage.ts**: 图片存储管理，支持元数据和清理
-
-### 扩展开发
-
-#### 添加新工具
-```typescript
-// 在 index.ts 中添加新工具
-const tools = [
-  // 现有工具...
-  {
-    name: "your_new_tool",
-    description: "您的新工具描述",
-    inputSchema: {
-      type: "object",
-      properties: {
-        // 参数定义
-      }
-    }
-  }
-];
-
-// 在工具调用处理中添加逻辑
-if (name === "your_new_tool") {
-  // 处理逻辑
-}
-```
-
-#### 添加新提示词模板
-```typescript
-// 在 prompts 数组中添加
-{
-  name: "your-prompt-template",
-  description: "您的提示词模板",
-  arguments: [
-    {
-      name: "param",
-      description: "参数描述",
-      required: true
-    }
-  ]
-}
-```
-
-#### 添加新配置选项
-```typescript
-// 在 config.ts 中扩展配置
-const ConfigSchema = z.object({
-  // 现有配置...
-  yourNewOption: z.string().default("default_value")
-});
-```
-
-### 性能优化
-
-#### 并发控制调优
-```typescript
-// 根据API限制调整并发数
-const MAX_CONCURRENT = process.env.MAX_CONCURRENT || 2;
-
-// 调整队列超时时间  
-const QUEUE_TIMEOUT = process.env.QUEUE_TIMEOUT || 300000;
-```
-
-#### 存储优化
-```typescript
-// 调整清理策略
-const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24小时
-const RETENTION_DAYS = 7; // 保留7天
-
-// 添加压缩选项
-const ENABLE_COMPRESSION = true;
-```
-
-#### 日志优化
-```typescript
-// 生产环境减少日志级别
-const LOG_LEVEL = process.env.NODE_ENV === 'production' ? 'INFO' : 'DEBUG';
-
-// 添加日志轮转
-const LOG_ROTATION = {
-  maxFiles: 5,
-  maxSize: '10m'
-};
-```
-
-### 部署建议
-
-#### Docker 部署
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-#### 环境配置
-```bash
-# 生产环境
-NODE_ENV=production
-LOG_LEVEL=INFO
-MAX_CONCURRENT_REQUESTS=3
-IMAGE_RETENTION_DAYS=30
-
-# 开发环境  
-NODE_ENV=development
-LOG_LEVEL=DEBUG
-MAX_CONCURRENT_REQUESTS=1
-```
-
-#### 监控集成
-```typescript
-// 添加健康检查端点
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    memory: process.memoryUsage()
-  });
-});
-
-// 添加指标收集
-const metrics = {
-  requestCount: 0,
-  errorCount: 0,
-  avgResponseTime: 0
-};
-```
+### v1.0.0 - 初始版本
+- ✅ 基础文本生成图像功能
+- ✅ 多模型支持
+- ✅ MCP 协议实现
 
 ## 🤝 贡献指南
 
@@ -888,12 +801,6 @@ npm run dev
 - 为所有公共接口提供类型定义
 - 避免使用 `any` 类型
 
-#### 代码风格
-- 使用 2 空格缩进
-- 使用分号结尾
-- 函数和变量使用 camelCase
-- 常量使用 UPPER_SNAKE_CASE
-
 #### 提交信息规范
 ```
 feat: 添加新功能
@@ -904,26 +811,6 @@ refactor: 重构代码
 test: 添加测试
 chore: 构建工具或依赖更新
 ```
-
-### 测试指南
-
-```bash
-# 运行所有测试
-npm test
-
-# 运行测试（测试模式）
-npm run test:watch
-
-# 构建检查
-npm run build
-```
-
-### 版本发布
-
-我们遵循 [语义化版本](https://semver.org/) 规范：
-- **MAJOR**: 不兼容的API变更
-- **MINOR**: 向后兼容的功能添加
-- **PATCH**: 向后兼容的问题修复
 
 ## 📄 许可证
 
@@ -948,7 +835,7 @@ npm run build
 - [通义万相官方文档](https://help.aliyun.com/zh/dashscope/developer-reference/api-details-9)
 - [MCP 协议规范](https://modelcontextprotocol.io/docs)
 - [阿里云百炼平台](https://bailian.console.aliyun.com/)
-- [项目优化文档](OPTIMIZATION.md)
+- [阿里云 OSS 控制台](https://oss.console.aliyun.com/)
 
 ## 📈 项目状态
 
@@ -961,4 +848,4 @@ npm run build
 
 **🎨 让AI图像生成更简单、更专业、更可靠！**
 
-*通过智能提示词系统和企业级架构，为开发者提供最佳的AI图像生成体验。*
+*通过智能提示词系统、完整的图像编辑功能和企业级 OSS 存储，为开发者提供最佳的AI图像生成体验。*

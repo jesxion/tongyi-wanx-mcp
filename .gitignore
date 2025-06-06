@@ -65,3 +65,7 @@ verify-*.js
 
 # Docker
 .dockerignore
+
+# Guide Document
+wanx-poster-generation-v1.md
+wanx2.1-imageedit.md
