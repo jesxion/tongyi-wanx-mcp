@@ -39,14 +39,17 @@ export class ImageStorage {
   private readonly metadataFile: string;
   private readonly imagesDir: string;
   private cleanupInterval: NodeJS.Timeout | null = null;
-
-  constructor(imagesDir: string = Config.IMAGES_DIR) {
-    this.imagesDir = imagesDir;
-    this.metadataFile = join(imagesDir, 'metadata.json');
+  constructor(imagesDir?: string) {
+    if (!imagesDir && !Config.IMAGES_DIR) {
+      throw new TongyiError('INVALID_CONFIG', '未配置图片存储目录，请设置 IMAGES_DIR 环境变量');
+    }
+    
+    this.imagesDir = imagesDir || Config.IMAGES_DIR!;
+    this.metadataFile = join(this.imagesDir, 'metadata.json');
     this.loadMetadata();
     this.startCleanupScheduler();
     
-    Logger.info(`图片存储管理器初始化，目录: ${imagesDir}`);
+    Logger.info(`图片存储管理器初始化，目录: ${this.imagesDir}`);
   }
 
   /**

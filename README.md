@@ -56,8 +56,22 @@ cd tongyi-wanx-mcp
 npm install
 ```
 
-### 3. 配置API密钥（可选）
+### 3. 配置环境变量
 
+#### 必需的环境变量
+
+**图片存储目录（必需）:**
+```powershell
+# Windows (PowerShell)
+$env:IMAGES_DIR="C:\path\to\your\images\directory"
+
+# Linux/Mac
+export IMAGES_DIR="/path/to/your/images/directory"
+```
+
+#### 可选的环境变量
+
+**API密钥（生产环境推荐）:**
 如果要使用真实的图像生成功能，需要配置API密钥：
 
 1. 访问 [阿里云百炼平台](https://bailian.console.aliyun.com/)
@@ -76,6 +90,7 @@ export DASHSCOPE_API_KEY="your-api-key-here"
 
 **或者创建 `.env` 文件:**
 ```env
+IMAGES_DIR=./your-images-directory
 DASHSCOPE_API_KEY=your-api-key-here
 ```
 
@@ -338,9 +353,9 @@ style-examples-chinese-ink   # 国风水墨风格示例
 ## 🔧 配置与环境
 
 ### 环境变量配置
+- `IMAGES_DIR`: 图片存储路径 (**必需**, 必须在 MCP host/client 端配置)
 - `DASHSCOPE_API_KEY`: 通义万相API密钥 (可选，测试模式无需)
 - `LOG_LEVEL`: 日志级别 (DEBUG, INFO, ERROR，默认: INFO)
-- `IMAGE_STORAGE_PATH`: 图片存储路径 (默认: ./generated_images)
 - `MAX_CONCURRENT_REQUESTS`: 最大并发请求数 (默认: 2)
 - `CLEANUP_INTERVAL_HOURS`: 清理间隔小时 (默认: 24)
 - `IMAGE_RETENTION_DAYS`: 图片保留天数 (默认: 7)
@@ -391,6 +406,7 @@ style-examples-chinese-ink   # 国风水墨风格示例
       "command": "node",
       "args": ["C:/path/to/tongyi-wanx-mcp/dist/index.js"],
       "env": {
+        "IMAGES_DIR": "C:/path/to/your/images/directory",
         "DASHSCOPE_API_KEY": "your-api-key-here"
       }
     }

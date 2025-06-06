@@ -7,9 +7,8 @@ export class Config {
   // API配置
   static readonly API_KEY = process.env.DASHSCOPE_API_KEY;
   static readonly BASE_URL = process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com";
-  
-  // 存储配置
-  static readonly IMAGES_DIR = process.env.IMAGES_DIR || "./generated_images";
+    // 存储配置 - 必须由用户在 MCP host/client 端配置
+  static readonly IMAGES_DIR = process.env.IMAGES_DIR;
   
   // 任务配置
   static readonly MAX_WAIT_TIME = parseInt(process.env.MAX_WAIT_TIME || "300000"); // 5分钟
@@ -26,13 +25,16 @@ export class Config {
   // 清理配置
   static readonly IMAGE_RETENTION_DAYS = parseInt(process.env.IMAGE_RETENTION_DAYS || "7");
   static readonly CLEANUP_INTERVAL_HOURS = parseInt(process.env.CLEANUP_INTERVAL_HOURS || "24");
-
   /**
    * 验证配置
    */
   static validate(): void {
     if (!Config.API_KEY && !Config.ALLOW_TEST_MODE) {
       throw new Error("错误: 请设置 DASHSCOPE_API_KEY 环境变量或设置 ALLOW_TEST_MODE=true 进入测试模式");
+    }
+
+    if (!Config.IMAGES_DIR) {
+      throw new Error("错误: 请在 MCP host/client 端设置 IMAGES_DIR 环境变量来指定图片存储目录");
     }
 
     if (Config.MAX_WAIT_TIME < 10000) {
@@ -48,14 +50,13 @@ export class Config {
       mkdirSync(Config.IMAGES_DIR, { recursive: true });
     }
   }
-
   /**
    * 打印配置信息
    */
   static printInfo(): void {
     console.error("=== 通义万相 MCP 服务器配置 ===");
     console.error(`测试模式: ${Config.IS_TEST_MODE ? '启用' : '禁用'}`);
-    console.error(`图片存储目录: ${Config.IMAGES_DIR}`);
+    console.error(`图片存储目录: ${Config.IMAGES_DIR || '未配置'}`);
     console.error(`最大等待时间: ${Config.MAX_WAIT_TIME}ms`);
     console.error(`轮询间隔: ${Config.POLL_INTERVAL}ms`);
     console.error(`最大并发请求: ${Config.MAX_CONCURRENT_REQUESTS}`);
