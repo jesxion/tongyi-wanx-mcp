@@ -3,6 +3,9 @@
  * 提供提示词分析、优化建议和自动增强功能
  */
 
+import { globalCache, CacheKeyGenerator } from './cache-manager.js';
+import { Logger } from './logger.js';
+
 export interface PromptAnalysis {
   components: {
     subject: string[];
@@ -69,26 +72,43 @@ export class PromptOptimizer {
       '静物': ['产品', '食物', '花卉', '装饰品', '艺术品']
     }
   };
-
   /**
-   * 分析并优化提示词
+   * 分析并优化提示词 - 集成缓存系统
    */
   static analyzeAndOptimize(
     originalPrompt: string,
     targetStyle?: string,
     level: string = 'advanced'
   ): PromptOptimizationResult {
+    // 生成缓存键
+    const cacheKey = CacheKeyGenerator.promptOptimization(originalPrompt, level, targetStyle);
+    
+    // 尝试从缓存获取结果
+    const cachedResult = globalCache.get<PromptOptimizationResult>(cacheKey);
+    if (cachedResult) {
+      Logger.debug(`提示词优化缓存命中: ${originalPrompt.substring(0, 50)}...`);
+      return cachedResult;
+    }
+
+    // 缓存未命中，执行优化
+    Logger.debug(`提示词优化缓存未命中，开始分析: ${originalPrompt.substring(0, 50)}...`);
+    
     const analysis = this.analyzePrompt(originalPrompt);
     const suggestions = this.generateSuggestions(analysis, targetStyle, level);
     const optimizedPrompt = this.buildOptimizedPrompt(originalPrompt, suggestions);
     
-    return {
+    const result: PromptOptimizationResult = {
       original: originalPrompt,
       optimized: optimizedPrompt,
       analysis,
       suggestions,
       improvements: this.calculateImprovements(analysis, optimizedPrompt)
     };
+
+    // 缓存结果（缓存10分钟）
+    globalCache.set(cacheKey, result, 10 * 60 * 1000);
+    
+    return result;
   }
 
   /**

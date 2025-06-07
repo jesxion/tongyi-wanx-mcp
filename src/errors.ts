@@ -1,4 +1,119 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { Logger } from './logger.js';
+
+/**
+ * 熔断器状态枚举
+ */
+enum CircuitBreakerState {
+  CLOSED = 'CLOSED',
+  OPEN = 'OPEN',
+  HALF_OPEN = 'HALF_OPEN'
+}
+
+/**
+ * 熔断器配置
+ */
+interface CircuitBreakerConfig {
+  failureThreshold: number; // 失败阈值
+  timeout: number; // 熔断超时时间(ms)
+  monitoringPeriod: number; // 监控周期(ms)
+}
+
+/**
+ * 熔断器类 - 防止级联故障
+ */
+export class CircuitBreaker {
+  private state: CircuitBreakerState = CircuitBreakerState.CLOSED;
+  private failureCount = 0;
+  private nextAttemptTime = 0;
+
+  constructor(
+    private name: string,
+    private config: CircuitBreakerConfig = {
+      failureThreshold: 5,
+      timeout: 60000, // 1分钟
+      monitoringPeriod: 10000 // 10秒
+    }
+  ) {
+    Logger.debug(`熔断器初始化: ${name}, 失败阈值: ${config.failureThreshold}`);
+  }
+
+  /**
+   * 执行被保护的操作
+   */
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === CircuitBreakerState.OPEN) {
+      if (Date.now() < this.nextAttemptTime) {
+        throw new TongyiError(
+          'CIRCUIT_BREAKER_OPEN',
+          `熔断器 ${this.name} 处于开放状态，请稍后重试`,
+          undefined,
+          undefined,
+          false
+        );
+      }
+      // 尝试半开状态
+      this.state = CircuitBreakerState.HALF_OPEN;
+      Logger.info(`熔断器 ${this.name} 进入半开状态，尝试恢复`);
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  /**
+   * 操作成功时调用
+   */
+  private onSuccess(): void {
+    this.failureCount = 0;
+    this.state = CircuitBreakerState.CLOSED;
+    if (this.state !== CircuitBreakerState.CLOSED) {
+      Logger.info(`熔断器 ${this.name} 恢复到关闭状态`);
+    }
+  }
+  /**
+   * 操作失败时调用
+   */
+  private onFailure(): void {
+    this.failureCount++;
+
+    if (this.failureCount >= this.config.failureThreshold) {
+      this.state = CircuitBreakerState.OPEN;
+      this.nextAttemptTime = Date.now() + this.config.timeout;
+      Logger.warn(`熔断器 ${this.name} 开启，失败次数: ${this.failureCount}`);
+    }
+  }
+
+  /**
+   * 获取熔断器状态
+   */
+  getStatus(): {
+    state: CircuitBreakerState;
+    failureCount: number;
+    nextAttemptTime: number;
+  } {
+    return {
+      state: this.state,
+      failureCount: this.failureCount,
+      nextAttemptTime: this.nextAttemptTime
+    };
+  }
+  /**
+   * 手动重置熔断器
+   */
+  reset(): void {
+    this.state = CircuitBreakerState.CLOSED;
+    this.failureCount = 0;
+    this.nextAttemptTime = 0;
+    Logger.info(`熔断器 ${this.name} 已手动重置`);
+  }
+}
 
 /**
  * 通义万相服务错误类

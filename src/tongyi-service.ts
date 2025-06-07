@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { Config } from './config.js';
 import { Logger } from './logger.js';
-import { TongyiError, ErrorHandler } from './errors.js';
-import { ConcurrencyManager, withPerformanceMonitoring } from './concurrency.js';
+import { TongyiError, ErrorHandler, CircuitBreaker } from './errors.js';
+import { ConcurrencyManager, withPerformanceMonitoring, RequestPriority } from './concurrency.js';
 
 // 支持的模型
 export const SUPPORTED_MODELS = [
@@ -14,11 +14,6 @@ export const SUPPORTED_MODELS = [
 // 支持的图像编辑模型
 export const SUPPORTED_IMAGE_EDIT_MODELS = [
   "wanx2.1-imageedit"
-] as const;
-
-// 支持的海报生成模型
-export const SUPPORTED_POSTER_MODELS = [
-  "wanx-poster-generation-v1"
 ] as const;
 
 // 任务状态枚举
@@ -72,41 +67,6 @@ export const IMAGE_EDIT_FUNCTIONS = {
   CONTROL_CARTOON_FEATURE: "control_cartoon_feature"
 } as const;
 
-// 海报生成样式枚举 - 官方支持的18种风格
-export const POSTER_STYLES = {
-  TWO_D_ILLUSTRATION_1: "2D插画1",
-  TWO_D_ILLUSTRATION_2: "2D插画2",
-  VAST_NEBULA: "浩瀚星云",
-  RICH_COLOR: "浓郁色彩",
-  LIGHT_PARTICLE: "光线粒子",
-  TRANSPARENT_GLASS: "透明玻璃",
-  PAPER_CUT_CRAFT: "剪纸工艺",
-  ORIGAMI_CRAFT: "折纸工艺",
-  CHINESE_INK: "中国水墨",
-  CHINESE_EMBROIDERY: "中国刺绣",
-  REAL_SCENE: "真实场景",
-  TWO_D_CARTOON: "2D卡通",
-  CHILDREN_WATERCOLOR: "儿童水彩",
-  CYBER_BACKGROUND: "赛博背景",
-  LIGHT_BLUE_ABSTRACT: "浅蓝抽象",
-  DEEP_BLUE_ABSTRACT: "深蓝抽象",
-  ABSTRACT_DOT_LINE: "抽象点线",
-  FAIRY_TALE_OIL: "童话油画"
-} as const;
-
-// 海报生成模式枚举
-export const POSTER_GENERATION_MODES = {
-  GENERATE: "generate",
-  SUPER_RESOLUTION: "sr", 
-  HIGH_RESOLUTION_FIX: "hrf"
-} as const;
-
-// 海报布局枚举
-export const POSTER_LAYOUTS = {
-  LANDSCAPE: "横版",
-  PORTRAIT: "竖版"
-} as const;
-
 // 图像编辑请求参数 Schema
 export const ImageEditSchema = z.object({
   model: z.enum(SUPPORTED_IMAGE_EDIT_MODELS).default("wanx2.1-imageedit"),
@@ -158,91 +118,6 @@ export const ImageEditSchema = z.object({
   path: ["mask_image_url"]
 });
 
-// 海报生成请求参数 Schema
-export const PosterGenerationSchema = z.object({
-  model: z.enum(SUPPORTED_POSTER_MODELS).default("wanx-poster-generation-v1"),
-  // 文本内容
-  title: z.string()
-    .min(1, "标题不能为空")
-    .max(30, "标题长度不能超过30个字符"),
-  sub_title: z.string()
-    .max(30, "副标题长度不能超过30个字符")
-    .optional(),
-  body_text: z.string()
-    .max(50, "正文长度不能超过50个字符")
-    .optional(),
-  // 提示词文本（中英文至少一个）
-  prompt_text_zh: z.string()
-    .max(50, "中文提示词长度不能超过50个字符")
-    .optional(),
-  prompt_text_en: z.string()
-    .max(50, "英文提示词长度不能超过50个单词")
-    .optional(),  // 样式控制
-  lora_name: z.enum([
-    POSTER_STYLES.TWO_D_ILLUSTRATION_1,
-    POSTER_STYLES.TWO_D_ILLUSTRATION_2,
-    POSTER_STYLES.VAST_NEBULA,
-    POSTER_STYLES.RICH_COLOR,
-    POSTER_STYLES.LIGHT_PARTICLE,
-    POSTER_STYLES.TRANSPARENT_GLASS,
-    POSTER_STYLES.PAPER_CUT_CRAFT,
-    POSTER_STYLES.ORIGAMI_CRAFT,
-    POSTER_STYLES.CHINESE_INK,
-    POSTER_STYLES.CHINESE_EMBROIDERY,
-    POSTER_STYLES.REAL_SCENE,
-    POSTER_STYLES.TWO_D_CARTOON,
-    POSTER_STYLES.CHILDREN_WATERCOLOR,
-    POSTER_STYLES.CYBER_BACKGROUND,
-    POSTER_STYLES.LIGHT_BLUE_ABSTRACT,
-    POSTER_STYLES.DEEP_BLUE_ABSTRACT,
-    POSTER_STYLES.ABSTRACT_DOT_LINE,
-    POSTER_STYLES.FAIRY_TALE_OIL
-  ]).default(POSTER_STYLES.TWO_D_ILLUSTRATION_1),
-  lora_weight: z.number()
-    .min(0.0)
-    .max(1.0)
-    .default(0.8), // 修正默认值 0.6 → 0.8
-  // 布局控制
-  wh_ratios: z.enum([POSTER_LAYOUTS.LANDSCAPE, POSTER_LAYOUTS.PORTRAIT])
-    .default(POSTER_LAYOUTS.PORTRAIT), // 修正参数名 layout → wh_ratios
-  creative_title_layout: z.boolean().default(false), // 修正默认值 true → false
-  // ControlNet 参数
-  ctrl_ratio: z.number()
-    .min(0.0)
-    .max(1.0)
-    .default(0.7), // 修正默认值 0.4 → 0.7
-  ctrl_step: z.number()
-    .min(0.0, "ctrl_step必须大于0")
-    .max(1.0)
-    .default(0.7), // 修正类型和默认值：int(20) → float(0.7)
-  // 生成模式
-  generate_mode: z.enum([
-    POSTER_GENERATION_MODES.GENERATE,
-    POSTER_GENERATION_MODES.SUPER_RESOLUTION,
-    POSTER_GENERATION_MODES.HIGH_RESOLUTION_FIX
-  ]).default(POSTER_GENERATION_MODES.GENERATE), // 修正参数名 mode → generate_mode
-  // 通用参数
-  generate_num: z.number().int().min(1).max(4).default(1), // 修正参数名 n → generate_num  seed: z.number().int().min(0).max(2147483647).optional(),
-  watermark: z.boolean().default(false),
-  // 高分辨率模式参数
-  auxiliary_parameters: z.string().optional()
-}).refine(data => {
-  // 中英文提示词至少提供一个
-  return !!(data.prompt_text_zh || data.prompt_text_en);
-}, {
-  message: "中文提示词或英文提示词至少需要提供一个",
-  path: ["prompt_text_zh", "prompt_text_en"]
-}).refine(data => {
-  // sr 或 hrf 模式需要提供 auxiliary_parameters
-  if (data.generate_mode === "sr" || data.generate_mode === "hrf") {
-    return !!data.auxiliary_parameters;
-  }
-  return true;
-}, {
-  message: "超分辨率(sr)和高清修复(hrf)模式需要提供辅助参数",
-  path: ["auxiliary_parameters"]
-});
-
 // API 响应接口
 export interface CreateTaskResponse {
   output: {
@@ -290,12 +165,20 @@ export class TongyiWanxService {
   private baseUrl: string;
   private isTestMode: boolean;
   private concurrencyManager: ConcurrencyManager;
+  private circuitBreaker: CircuitBreaker;
 
   constructor(apiKey: string = Config.API_KEY || '') {
     this.apiKey = apiKey;
     this.baseUrl = Config.BASE_URL;
     this.isTestMode = Config.IS_TEST_MODE;
     this.concurrencyManager = new ConcurrencyManager(Config.MAX_CONCURRENT_REQUESTS);
+    
+    // 初始化熔断器：5次失败后熔断，恢复时间30秒
+    this.circuitBreaker = new CircuitBreaker('TongyiAPI', {
+      failureThreshold: 5,
+      timeout: 30000, // 30秒恢复时间
+      monitoringPeriod: 10000 // 10秒监控周期
+    });
     
     Logger.info(`通义万相服务初始化 ${this.isTestMode ? '(测试模式)' : ''}`);
   }
@@ -304,79 +187,84 @@ export class TongyiWanxService {
    * 创建文生图任务
    */
   async createTextToImageTask(params: z.infer<typeof TextToImageSchema>): Promise<CreateTaskResponse> {
-    return this.concurrencyManager.execute(async () => {
-      if (this.isTestMode) {
-        return this.createMockResponse(params);
-      }
+    return this.concurrencyManager.execute(
+      async () => {
+        if (this.isTestMode) {
+          return this.createMockResponse(params);
+        }
 
-      return await ErrorHandler.wrapAsync(async () => {
-        const requestBody = {
-          model: params.model,
-          input: {
-            prompt: params.prompt,
-            ...(params.negative_prompt && { negative_prompt: params.negative_prompt })
-          },
-          parameters: {
+        // 使用熔断器保护API调用
+        return await this.circuitBreaker.execute(async () => {
+        return await ErrorHandler.wrapAsync(async () => {
+          const requestBody = {
+            model: params.model,
+            input: {
+              prompt: params.prompt,
+              ...(params.negative_prompt && { negative_prompt: params.negative_prompt })
+            },
+            parameters: {
+              size: params.size,
+              n: params.n,
+              ...(params.seed !== undefined && { seed: params.seed }),
+              prompt_extend: params.prompt_extend,
+              watermark: params.watermark
+            }
+          };
+
+          Logger.debug('创建文生图任务请求', { 
+            model: params.model, 
+            prompt: params.prompt.substring(0, 100) + '...',
             size: params.size,
-            n: params.n,
-            ...(params.seed !== undefined && { seed: params.seed }),
-            prompt_extend: params.prompt_extend,
-            watermark: params.watermark
+            n: params.n
+          });
+
+          const url = `${this.baseUrl}/api/v1/services/aigc/text2image/image-synthesis`;
+          Logger.apiCall('POST', url);
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${this.apiKey}`,
+              "X-DashScope-Async": "enable"
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          Logger.apiCall('POST', url, response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            Logger.error(`API请求失败: ${response.status} ${response.statusText}`, errorText);
+            ErrorHandler.handleApiError(response, '创建文生图任务');
           }
-        };
 
-        Logger.debug('创建文生图任务请求', { 
-          model: params.model, 
-          prompt: params.prompt.substring(0, 100) + '...',
-          size: params.size,
-          n: params.n
-        });
+          const result = await response.json() as CreateTaskResponse;
+          
+          if (result.code) {
+            Logger.error(`API业务错误: ${result.code} - ${result.message}`);
+            ErrorHandler.handleTongyiApiError(result, '创建文生图任务');
+          }
 
-        const url = `${this.baseUrl}/api/v1/services/aigc/text2image/image-synthesis`;
-        Logger.apiCall('POST', url);
+          Logger.info(`任务创建成功: ${result.output.task_id}`);
+          return result;
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.apiKey}`,
-            "X-DashScope-Async": "enable"
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        Logger.apiCall('POST', url, response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          Logger.error(`API请求失败: ${response.status} ${response.statusText}`, errorText);
-          ErrorHandler.handleApiError(response, '创建文生图任务');
-        }
-
-        const result = await response.json() as CreateTaskResponse;
-        
-        if (result.code) {
-          Logger.error(`API业务错误: ${result.code} - ${result.message}`);
-          ErrorHandler.handleTongyiApiError(result, '创建文生图任务');
-        }
-
-        Logger.info(`任务创建成功: ${result.output.task_id}`);
-        return result;
-
-      }, '创建文生图任务', 2); // 最多重试2次
-    });
+        }, '创建文生图任务', 2); // 最多重试2次
+      });
+    }, RequestPriority.HIGH, '创建文生图任务');
   }
 
   /**
    * 查询任务状态和结果
    */
   async queryTask(taskId: string): Promise<QueryTaskResponse> {
-    return this.concurrencyManager.execute(async () => {
-      if (this.isTestMode) {
-        return this.createMockQueryResponse(taskId);
-      }
+    return this.concurrencyManager.execute(
+      async () => {
+        if (this.isTestMode) {
+          return this.createMockQueryResponse(taskId);
+        }
 
-      return await ErrorHandler.wrapAsync(async () => {
+        return await ErrorHandler.wrapAsync(async () => {
         const url = `${this.baseUrl}/api/v1/tasks/${taskId}`;
         Logger.apiCall('GET', url);
 
@@ -406,18 +294,20 @@ export class TongyiWanxService {
         return result;
 
       }, '查询任务状态', 3); // 查询任务可以重试更多次
-    });
+    }, RequestPriority.NORMAL, `查询任务状态-${taskId}`);
   }
+
   /**
    * 创建图像编辑任务
    */
   async createImageEditTask(params: z.infer<typeof ImageEditSchema>): Promise<CreateTaskResponse> {
-    return this.concurrencyManager.execute(async () => {
-      if (this.isTestMode) {
-        return this.createMockImageEditResponse(params);
-      }
+    return this.concurrencyManager.execute(
+      async () => {
+        if (this.isTestMode) {
+          return this.createMockImageEditResponse(params);
+        }
 
-      return await ErrorHandler.wrapAsync(async () => {
+        return await ErrorHandler.wrapAsync(async () => {
         const requestBody = {
           model: params.model,
           input: {
@@ -477,110 +367,14 @@ export class TongyiWanxService {
         }
 
         Logger.info(`图像编辑任务创建成功: ${result.output.task_id}`);
-        return result;      }, '创建图像编辑任务', 2); // 最多重试2次
-    });
-  }
-
-  /**
-   * 创建海报生成任务
-   */
-  async createPosterGenerationTask(params: z.infer<typeof PosterGenerationSchema>): Promise<CreateTaskResponse> {
-    return this.concurrencyManager.execute(async () => {
-      if (this.isTestMode) {
-        return this.createMockPosterResponse(params);
-      }
-
-      return await ErrorHandler.wrapAsync(async () => {        const requestBody = {
-          model: params.model,
-          input: {
-            title: params.title,
-            ...(params.sub_title && { sub_title: params.sub_title }),
-            ...(params.body_text && { body_text: params.body_text }),
-            ...(params.prompt_text_zh && { prompt_text_zh: params.prompt_text_zh }),
-            ...(params.prompt_text_en && { prompt_text_en: params.prompt_text_en }),
-            // API 参数映射
-            wh_ratios: params.wh_ratios, // layout → wh_ratios
-            lora_name: params.lora_name,
-            lora_weight: params.lora_weight,
-            creative_title_layout: params.creative_title_layout,
-            ctrl_ratio: params.ctrl_ratio,
-            ctrl_step: params.ctrl_step,            generate_mode: params.generate_mode, // mode → generate_mode
-            generate_num: params.generate_num, // n → generate_num
-            ...(params.auxiliary_parameters && { auxiliary_parameters: params.auxiliary_parameters })
-          },
-          parameters: {}
-        };        
-        Logger.debug('创建海报生成任务请求', { 
-          model: params.model, 
-          title: params.title,
-          lora_name: params.lora_name,
-          wh_ratios: params.wh_ratios, // 修正参数名
-          generate_num: params.generate_num // 修正参数名
-        });
-
-        const url = `${this.baseUrl}/api/v1/services/aigc/poster-generation/generation`;
-        Logger.apiCall('POST', url);
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.apiKey}`,
-            "X-DashScope-Async": "enable"
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        Logger.apiCall('POST', url, response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          Logger.error(`API请求失败: ${response.status} ${response.statusText}`, errorText);
-          ErrorHandler.handleApiError(response, '创建海报生成任务');
-        }
-
-        const result = await response.json() as CreateTaskResponse;
-        
-        if (result.code) {
-          Logger.error(`API业务错误: ${result.code} - ${result.message}`);
-          ErrorHandler.handleTongyiApiError(result, '创建海报生成任务');
-        }
-
-        Logger.info(`海报生成任务创建成功: ${result.output.task_id}`);
         return result;
+      }, '创建图像编辑任务', 2); // 最多重试2次
+    }, RequestPriority.HIGH, '创建图像编辑任务');
+  }
 
-      }, '创建海报生成任务', 2); // 最多重试2次
-    });
-  }
   /**
-   * 测试模式：创建模拟图像编辑响应
+   * 等待任务完成
    */
-  private createMockImageEditResponse(_params: any): CreateTaskResponse {
-    const mockTaskId = `mock_edit_task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    Logger.info(`测试模式：创建模拟图像编辑任务 ${mockTaskId}`);
-    
-    return {
-      output: {
-        task_id: mockTaskId,
-        task_status: "PENDING"
-      },
-      request_id: `mock_edit_request_${Date.now()}`
-    };
-  }
-  /**
-   * 测试模式：创建模拟海报生成响应
-   */  private createMockPosterResponse(params: z.infer<typeof PosterGenerationSchema>): CreateTaskResponse {
-    const mockTaskId = `mock_poster_task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    Logger.info(`测试模式：创建模拟海报生成任务 ${mockTaskId} - 标题: ${params.title}, 样式: ${params.lora_name}, 布局: ${params.wh_ratios}`);
-    
-    return {
-      output: {
-        task_id: mockTaskId,
-        task_status: "PENDING"
-      },
-      request_id: `mock_poster_request_${Date.now()}`
-    };
-  }
   async waitForTaskCompletion(
     taskId: string, 
     maxWaitTime: number = Config.MAX_WAIT_TIME, 
@@ -624,6 +418,7 @@ export class TongyiWanxService {
       );
     }, `等待任务完成-${taskId}`)();
   }
+
   /**
    * 测试模式：创建模拟响应
    */
@@ -639,6 +434,23 @@ export class TongyiWanxService {
       request_id: `mock_request_${Date.now()}`
     };
   }
+
+  /**
+   * 测试模式：创建模拟图像编辑响应
+   */
+  private createMockImageEditResponse(_params: any): CreateTaskResponse {
+    const mockTaskId = `mock_edit_task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    Logger.info(`测试模式：创建模拟图像编辑任务 ${mockTaskId}`);
+    
+    return {
+      output: {
+        task_id: mockTaskId,
+        task_status: "PENDING"
+      },
+      request_id: `mock_edit_request_${Date.now()}`
+    };
+  }
+
   /**
    * 测试模式：创建模拟查询响应
    */
@@ -678,6 +490,7 @@ export class TongyiWanxService {
       })
     };
   }
+
   /**
    * 获取支持的模型信息
    */
@@ -720,6 +533,7 @@ export class TongyiWanxService {
       }
     ];
   }
+
   /**
    * 获取图像编辑功能详情
    */
@@ -814,6 +628,7 @@ export class TongyiWanxService {
       }
     ];
   }
+
   /**
    * 获取服务状态
    */
@@ -827,169 +642,6 @@ export class TongyiWanxService {
       hasApiKey: !!this.apiKey,
       concurrencyStatus: this.concurrencyManager.getStatus()
     };
-  }
-
-  /**
-   * 获取海报样式列表
-   */  getPosterStyles(): Array<{
-    name: string;
-    displayName: string;
-    category: string;
-    description: string;
-  }> {
-    return [
-      {
-        name: POSTER_STYLES.TWO_D_ILLUSTRATION_1,
-        displayName: "2D插画1",
-        category: "插画风格",
-        description: "现代2D插画风格，线条清晰，色彩鲜明"
-      },
-      {
-        name: POSTER_STYLES.TWO_D_ILLUSTRATION_2,
-        displayName: "2D插画2",
-        category: "插画风格",
-        description: "另一种2D插画风格，更加柔和温馨"
-      },
-      {
-        name: POSTER_STYLES.VAST_NEBULA,
-        displayName: "浩瀚星云",
-        category: "科幻宇宙",
-        description: "浩瀚星云风格，充满神秘的宇宙色彩"
-      },
-      {
-        name: POSTER_STYLES.RICH_COLOR,
-        displayName: "浓郁色彩",
-        category: "色彩丰富",
-        description: "色彩浓郁饱满，视觉冲击力强"
-      },
-      {
-        name: POSTER_STYLES.LIGHT_PARTICLE,
-        displayName: "光线粒子",
-        category: "光效特效",
-        description: "光线粒子效果，营造梦幻光影"
-      },
-      {
-        name: POSTER_STYLES.TRANSPARENT_GLASS,
-        displayName: "透明玻璃",
-        category: "材质质感",
-        description: "透明玻璃质感，现代简约风格"
-      },
-      {
-        name: POSTER_STYLES.PAPER_CUT_CRAFT,
-        displayName: "剪纸工艺",
-        category: "传统工艺",
-        description: "中国传统剪纸工艺风格，富有民族特色"
-      },
-      {
-        name: POSTER_STYLES.ORIGAMI_CRAFT,
-        displayName: "折纸工艺",
-        category: "传统工艺",
-        description: "精致的折纸工艺风格，立体感强"
-      },
-      {
-        name: POSTER_STYLES.CHINESE_INK,
-        displayName: "中国水墨",
-        category: "传统艺术",
-        description: "中国传统水墨画风格，意境深远"
-      },
-      {
-        name: POSTER_STYLES.CHINESE_EMBROIDERY,
-        displayName: "中国刺绣",
-        category: "传统艺术",
-        description: "中国传统刺绣风格，精致细腻，具有浓郁的民族特色"
-      },
-      {
-        name: POSTER_STYLES.REAL_SCENE,
-        displayName: "真实场景",
-        category: "写实主义",
-        description: "真实场景风格，接近摄影效果，细节丰富"
-      },
-      {
-        name: POSTER_STYLES.TWO_D_CARTOON,
-        displayName: "2D卡通",
-        category: "卡通动漫",
-        description: "2D卡通风格，活泼可爱，色彩明亮"
-      },
-      {
-        name: POSTER_STYLES.CHILDREN_WATERCOLOR,
-        displayName: "儿童水彩",
-        category: "艺术绘画",
-        description: "儿童水彩画风格，纯真可爱，色彩柔和"
-      },
-      {
-        name: POSTER_STYLES.FAIRY_TALE_OIL,
-        displayName: "童话油画",
-        category: "艺术绘画",
-        description: "童话风格的油画效果，色彩丰富，充满梦幻色彩"
-      }
-    ];
-  }
-
-  /**
-   * 获取海报模板示例
-   */  getPosterTemplates(): Array<{
-    name: string;
-    title: string;
-    subTitle?: string;
-    bodyText?: string;
-    promptTextZh?: string;
-    promptTextEn?: string;
-    style: string;
-    layout: string;
-    description: string;
-  }> {
-    return [
-      {
-        name: "商务发布会",
-        title: "新品发布会",
-        subTitle: "科技创新未来",
-        bodyText: "2024年度重磅产品即将亮相",
-        promptTextZh: "现代科技产品发布会场景",
-        style: POSTER_STYLES.VAST_NEBULA, // 使用浩瀚星云风格替代科技海报
-        layout: POSTER_LAYOUTS.LANDSCAPE,
-        description: "适合产品发布会、商务活动的海报模板"
-      },
-      {
-        name: "艺术展览",
-        title: "春日艺术展",
-        subTitle: "传统与现代的对话",
-        bodyText: "感受艺术的无限魅力",
-        promptTextZh: "春天艺术展览馆优雅场景",
-        style: POSTER_STYLES.CHINESE_INK, // 使用中国水墨风格替代中国风
-        layout: POSTER_LAYOUTS.PORTRAIT,
-        description: "适合艺术展览、文化活动的海报模板"
-      },
-      {
-        name: "青春校园",
-        title: "青春无悔",
-        subTitle: "梦想从这里起航",
-        bodyText: "记录美好的校园时光",
-        promptTextZh: "青春活力的校园生活场景",
-        style: POSTER_STYLES.RICH_COLOR, // 使用浓郁色彩风格替代青春风格
-        layout: POSTER_LAYOUTS.PORTRAIT,
-        description: "适合校园活动、青春主题的海报模板"
-      },
-      {
-        name: "科技未来",
-        title: "AI时代",
-        subTitle: "智能改变世界",
-        bodyText: "拥抱人工智能的无限可能",
-        promptTextEn: "futuristic AI technology scene",
-        style: POSTER_STYLES.LIGHT_PARTICLE, // 使用光线粒子风格替代赛博朋克
-        layout: POSTER_LAYOUTS.LANDSCAPE,
-        description: "适合科技活动、AI主题的海报模板"
-      },
-      {
-        name: "极简商务",
-        title: "简约之美",
-        subTitle: "少即是多",
-        bodyText: "追求极致的简约设计",
-        promptTextZh: "极简主义设计理念",
-        style: POSTER_STYLES.TRANSPARENT_GLASS, // 使用透明玻璃风格替代极简风格
-        layout: POSTER_LAYOUTS.PORTRAIT,
-        description: "适合品牌宣传、设计展示的海报模板"
-      }
-    ];
   }
 
   /**

@@ -26,14 +26,10 @@ import {
   TongyiWanxService, 
   TextToImageSchema, 
   ImageEditSchema,
-  PosterGenerationSchema,
   QueryTaskSchema, 
   SUPPORTED_MODELS, 
   SUPPORTED_IMAGE_EDIT_MODELS,
   IMAGE_EDIT_FUNCTIONS,
-  POSTER_STYLES,
-  POSTER_GENERATION_MODES,
-  POSTER_LAYOUTS,
   TASK_STATUS 
 } from './tongyi-service.js';
 import { 
@@ -186,106 +182,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {},
           additionalProperties: false
-        }
-      },      // 🎨 P1 - 扩展功能 (高优先级)
-      {
-        name: "generate_poster",
-        description: "创意海报生成，支持多种风格和布局，可以通过标题、副标题、正文等文本元素创建专业海报。需要提供标题和中文或英文提示词之一。",
-        inputSchema: {
-          type: "object",
-          properties: {
-            content: {
-              type: "string",
-              maxLength: 30,
-              description: "海报主要内容/标题，最多30个字符"
-            },
-            title: {
-              type: "string",
-              maxLength: 30,
-              description: "海报标题，最多30个字符（与content二选一，优先使用content）"
-            },
-            sub_title: {
-              type: "string",
-              maxLength: 30,
-              description: "海报副标题，最多30个字符（可选）"
-            },
-            body_text: {
-              type: "string",
-              maxLength: 50,
-              description: "海报正文，最多50个字符（可选）"
-            },
-            prompt_text_zh: {
-              type: "string",
-              maxLength: 50,
-              description: "中文提示词，描述期望的视觉效果，最多50个字符（与prompt_text_en二选一）"
-            },
-            prompt_text_en: {
-              type: "string",
-              maxLength: 50,
-              description: "英文提示词，描述期望的视觉效果，最多50个单词（与prompt_text_zh二选一）"
-            },
-            lora_name: {
-              type: "string",
-              enum: Object.values(POSTER_STYLES),
-              default: POSTER_STYLES.TWO_D_ILLUSTRATION_1,
-              description: "海报风格选择"
-            },            layout: {
-              type: "string",
-              enum: Object.values(POSTER_LAYOUTS),
-              default: POSTER_LAYOUTS.PORTRAIT,
-              description: "海报布局：横版或竖版（内部将映射为wh_ratios参数）"
-            },
-            mode: {
-              type: "string",
-              enum: Object.values(POSTER_GENERATION_MODES),
-              default: POSTER_GENERATION_MODES.GENERATE,
-              description: "生成模式：generate(生成)、sr(超分辨率)、hrf(高分辨率修复)（内部将映射为generate_mode参数）"
-            },            lora_weight: {
-              type: "number",
-              minimum: 0,
-              maximum: 1,
-              default: 0.8,
-              description: "风格强度控制，0-1之间"
-            },
-            creative_title_layout: {
-              type: "boolean",
-              default: false,
-              description: "是否启用创意标题布局"
-            },
-            ctrl_ratio: {
-              type: "number",
-              minimum: 0,
-              maximum: 1,
-              default: 0.7,
-              description: "控制比例，影响文本与背景的平衡"
-            },
-            ctrl_step: {
-              type: "number",
-              minimum: 0,
-              maximum: 1,
-              default: 0.7,
-              description: "控制步骤参数，影响生成质量，范围(0,1]，float类型"
-            },
-            n: {
-              type: "integer",
-              minimum: 1,
-              maximum: 4,
-              default: 1,
-              description: "生成海报的数量，1-4张（内部将映射为generate_num参数）"            },
-            watermark: {
-              type: "boolean",
-              default: false,
-              description: "是否添加AI生成水印"
-            },
-            wait_for_completion: {
-              type: "boolean",
-              default: true,
-              description: "是否等待任务完成并返回结果"
-            }
-          },
-          additionalProperties: false
-        }
-      },
+        }      },
       {
         name: "image_edit",
         description: "使用通义万相进行图像编辑。支持风格化、内容编辑、尺寸优化、上色等多种功能。",
@@ -390,26 +287,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["prompt", "function", "base_image_url"]
-        }
-      },
-      {
-        name: "get_poster_styles",
-        description: "获取所有可用的海报风格样式及其详细信息",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          additionalProperties: false
-        }
-      },
-      {
-        name: "get_poster_templates",
-        description: "获取海报模板示例，包含不同场景的完整配置",
-        inputSchema: {
-          type: "object",
-          properties: {},
-          additionalProperties: false
-        }
-      },
+        }      },
       {
         name: "get_image_edit_functions",
         description: "获取图像编辑功能详情和使用说明",
@@ -1308,184 +1186,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
                 image_edit_functions: functions,
                 total_functions: functions.length,
                 usage_tips: "每种功能都有特定的提示词技巧，请参考examples字段中的示例"
-              }, null, 2)
-            }
-          ]
-        };
-      }      // 🎨 海报生成工具处理
-      case "generate_poster": {        // 参数预处理和映射
-        const rawArgs = request.params.arguments as any;
-        
-        // 处理 content/title 参数映射和新旧参数名映射
-        const processedArgs = {
-          ...rawArgs,
-          // 优先使用 content，如果没有则使用 title
-          title: rawArgs.content || rawArgs.title,
-          // 如果用户只提供了基本参数，生成智能默认的提示词
-          prompt_text_zh: rawArgs.prompt_text_zh || 
-                          (rawArgs.content && !rawArgs.prompt_text_en ? 
-                           `${rawArgs.content}相关的视觉设计` : undefined),
-          prompt_text_en: rawArgs.prompt_text_en,
-          // 新旧API参数名映射
-          wh_ratios: rawArgs.layout,  // layout -> wh_ratios
-          generate_mode: rawArgs.mode, // mode -> generate_mode
-          generate_num: rawArgs.n      // n -> generate_num
-        };
-        
-        // 删除旧参数名避免冲突
-        delete processedArgs.layout;
-        delete processedArgs.mode;
-        delete processedArgs.n;
-        
-        Logger.debug('海报参数预处理', {
-          原始参数: rawArgs,
-          处理后参数: processedArgs
-        });
-
-        const params = PosterGenerationSchema.parse(processedArgs);
-        const waitForCompletion = rawArgs?.wait_for_completion ?? true;
-        
-        Logger.info(`开始生成海报: ${params.title} - 风格: ${params.lora_name}`);
-        
-        // 创建任务
-        const createResult = await tongyiService.createPosterGenerationTask(params);
-        
-        if (!waitForCompletion) {
-          // 只返回任务ID，不等待完成
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  success: true,
-                  task_id: createResult.output.task_id,
-                  task_status: createResult.output.task_status,                  title: params.title,
-                  style: params.lora_name,
-                  layout: rawArgs.layout || POSTER_LAYOUTS.PORTRAIT,
-                  message: "海报生成任务已创建，请使用 query_task 工具查询任务状态和结果"
-                }, null, 2)
-              }
-            ]
-          };
-        }
-        
-        // 等待任务完成
-        const finalResult = await tongyiService.waitForTaskCompletion(createResult.output.task_id);
-        
-        if (finalResult.output.task_status === TASK_STATUS.SUCCEEDED) {
-          const imageUrls = finalResult.output.results?.map(r => r.url).filter(Boolean) || [];
-          
-          // 下载并存储所有生成的海报
-          const storedImages: StoredImage[] = [];
-          for (const url of imageUrls) {
-            if (!url) continue;
-            
-            try {
-              const storedImage = await imageStorage.downloadAndStore(url, params.title, {
-                model: params.model,
-                title: params.title,
-                sub_title: params.sub_title,
-                body_text: params.body_text,
-                prompt_text_zh: params.prompt_text_zh,
-                prompt_text_en: params.prompt_text_en,                lora_name: params.lora_name,
-                layout: rawArgs.layout || POSTER_LAYOUTS.PORTRAIT,
-                mode: rawArgs.mode || POSTER_GENERATION_MODES.GENERATE,
-                task_id: createResult.output.task_id,
-                posterType: 'creative_poster'
-              });
-              storedImages.push(storedImage);
-              Logger.info(`海报存储成功: ${storedImage.filename}`);
-            } catch (error) {
-              Logger.error('海报存储失败', error);
-              // 继续处理其他图片
-            }
-          }
-          
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  success: true,
-                  task_id: finalResult.output.task_id,
-                  task_status: finalResult.output.task_status,                  title: params.title,
-                  style: params.lora_name,
-                  layout: rawArgs.layout || POSTER_LAYOUTS.PORTRAIT,
-                  image_resources: storedImages.length > 0 
-                    ? storedImages.map(img => ({
-                        resource_uri: img.resourceUri,
-                        filename: img.filename,
-                        local_path: img.localPath
-                      }))
-                    : undefined,
-                  image_urls: storedImages.length === 0 ? imageUrls : undefined,
-                  poster_config: {                    title: params.title,
-                    sub_title: params.sub_title,
-                    body_text: params.body_text,
-                    style: params.lora_name,
-                    layout: rawArgs.layout || POSTER_LAYOUTS.PORTRAIT,
-                    mode: rawArgs.mode || POSTER_GENERATION_MODES.GENERATE
-                  },
-                  image_count: finalResult.usage?.image_count || storedImages.length,
-                  submit_time: finalResult.output.submit_time,
-                  end_time: finalResult.output.end_time,
-                  message: storedImages.length > 0 
-                    ? `成功生成并存储 ${storedImages.length} 张海报，可通过MCP Resources访问`
-                    : `成功生成 ${imageUrls.length} 张海报`
-                }, null, 2)
-              }
-            ]
-          };
-        } else {
-          // 任务失败
-          const errorMessage = finalResult.output.results?.[0]?.message || '海报生成任务执行失败';
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  success: false,
-                  task_id: finalResult.output.task_id,
-                  task_status: finalResult.output.task_status,
-                  title: params.title,
-                  style: params.lora_name,
-                  error: errorMessage,
-                  submit_time: finalResult.output.submit_time,
-                  end_time: finalResult.output.end_time
-                }, null, 2)
-              }
-            ]
-          };
-        }
-      }
-
-      case "get_poster_styles": {
-        const styles = tongyiService.getPosterStyles();
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                poster_styles: styles,
-                total_styles: styles.length,
-                categories: [...new Set(styles.map(s => s.category))],
-                usage_tips: "选择合适的风格可以显著提升海报的视觉效果，建议根据内容主题选择风格"
-              }, null, 2)
-            }
-          ]
-        };
-      }
-
-      case "get_poster_templates": {
-        const templates = tongyiService.getPosterTemplates();
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                poster_templates: templates,
-                total_templates: templates.length,
-                usage_tips: "这些模板提供了完整的配置示例，可以直接使用或作为参考进行修改"
               }, null, 2)
             }
           ]

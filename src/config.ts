@@ -84,3 +84,196 @@ export class Config {  // API配置
     console.error("===============================");
   }
 }
+
+/**
+ * 动态配置管理器
+ * 支持运行时配置更新和配置变化监听
+ */
+export class DynamicConfigManager {
+  private static listeners: Map<string, ((oldValue: any, newValue: any) => void)[]> = new Map();
+  private static configCache: Map<string, any> = new Map();
+  
+  /**
+   * 注册配置变化监听器
+   */
+  static addConfigListener(configKey: string, listener: (oldValue: any, newValue: any) => void): void {
+    if (!this.listeners.has(configKey)) {
+      this.listeners.set(configKey, []);
+    }
+    this.listeners.get(configKey)!.push(listener);
+  }
+
+  /**
+   * 移除配置监听器
+   */
+  static removeConfigListener(configKey: string, listener: (oldValue: any, newValue: any) => void): void {
+    const listeners = this.listeners.get(configKey);
+    if (listeners) {
+      const index = listeners.indexOf(listener);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * 更新配置值
+   */
+  static updateConfig(configKey: string, newValue: any): boolean {
+    const oldValue = this.getConfigValue(configKey);
+    
+    // 验证配置值
+    if (!this.validateConfigValue(configKey, newValue)) {
+      return false;
+    }
+
+    // 更新配置缓存
+    this.configCache.set(configKey, newValue);
+    
+    // 通知监听器
+    const listeners = this.listeners.get(configKey);
+    if (listeners) {
+      listeners.forEach(listener => {
+        try {
+          listener(oldValue, newValue);
+        } catch (error) {
+          console.error(`配置监听器执行失败: ${configKey}`, error);
+        }
+      });
+    }
+
+    console.log(`配置已更新: ${configKey} = ${newValue} (旧值: ${oldValue})`);
+    return true;
+  }
+
+  /**
+   * 获取配置值
+   */
+  static getConfigValue(configKey: string): any {
+    if (this.configCache.has(configKey)) {
+      return this.configCache.get(configKey);
+    }
+    
+    // 从Config类获取初始值
+    switch (configKey) {
+      case 'MAX_CONCURRENT_REQUESTS':
+        return Config.MAX_CONCURRENT_REQUESTS;
+      case 'POLL_INTERVAL':
+        return Config.POLL_INTERVAL;
+      case 'MAX_WAIT_TIME':
+        return Config.MAX_WAIT_TIME;
+      case 'LOG_LEVEL':
+        return Config.LOG_LEVEL;
+      case 'IMAGE_RETENTION_DAYS':
+        return Config.IMAGE_RETENTION_DAYS;
+      case 'CLEANUP_INTERVAL_HOURS':
+        return Config.CLEANUP_INTERVAL_HOURS;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * 验证配置值
+   */
+  private static validateConfigValue(configKey: string, value: any): boolean {
+    switch (configKey) {
+      case 'MAX_CONCURRENT_REQUESTS':
+        return typeof value === 'number' && value > 0 && value <= 10;
+      case 'POLL_INTERVAL':
+        return typeof value === 'number' && value >= 1000 && value <= 60000;
+      case 'MAX_WAIT_TIME':
+        return typeof value === 'number' && value >= 10000 && value <= 3600000; // 1小时最大
+      case 'LOG_LEVEL':
+        return ['DEBUG', 'INFO', 'WARN', 'ERROR'].includes(value);
+      case 'IMAGE_RETENTION_DAYS':
+        return typeof value === 'number' && value >= 1 && value <= 365;
+      case 'CLEANUP_INTERVAL_HOURS':
+        return typeof value === 'number' && value >= 1 && value <= 168; // 7天最大
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * 获取所有可配置的参数
+   */
+  static getConfigurableParams(): Record<string, {
+    currentValue: any;
+    description: string;
+    type: string;
+    validRange?: string;
+  }> {
+    return {
+      MAX_CONCURRENT_REQUESTS: {
+        currentValue: this.getConfigValue('MAX_CONCURRENT_REQUESTS'),
+        description: '最大并发请求数',
+        type: 'number',
+        validRange: '1-10'
+      },
+      POLL_INTERVAL: {
+        currentValue: this.getConfigValue('POLL_INTERVAL'),
+        description: '任务轮询间隔(ms)',
+        type: 'number',
+        validRange: '1000-60000'
+      },
+      MAX_WAIT_TIME: {
+        currentValue: this.getConfigValue('MAX_WAIT_TIME'),
+        description: '最大等待时间(ms)',
+        type: 'number',
+        validRange: '10000-3600000'
+      },
+      LOG_LEVEL: {
+        currentValue: this.getConfigValue('LOG_LEVEL'),
+        description: '日志级别',
+        type: 'string',
+        validRange: 'DEBUG, INFO, WARN, ERROR'
+      },
+      IMAGE_RETENTION_DAYS: {
+        currentValue: this.getConfigValue('IMAGE_RETENTION_DAYS'),
+        description: '图片保留天数',
+        type: 'number',
+        validRange: '1-365'
+      },
+      CLEANUP_INTERVAL_HOURS: {
+        currentValue: this.getConfigValue('CLEANUP_INTERVAL_HOURS'),
+        description: '清理间隔小时数',
+        type: 'number',
+        validRange: '1-168'
+      }
+    };
+  }
+
+  /**
+   * 批量更新配置
+   */
+  static updateConfigs(configs: Record<string, any>): {
+    success: string[];
+    failed: Array<{ key: string; reason: string }>;
+  } {
+    const success: string[] = [];
+    const failed: Array<{ key: string; reason: string }> = [];
+
+    for (const [key, value] of Object.entries(configs)) {
+      try {
+        if (this.updateConfig(key, value)) {
+          success.push(key);
+        } else {
+          failed.push({ key, reason: '配置值验证失败' });
+        }
+      } catch (error) {
+        failed.push({ key, reason: `更新失败: ${error}` });
+      }
+    }
+
+    return { success, failed };
+  }
+
+  /**
+   * 重置所有配置到默认值
+   */
+  static resetToDefaults(): void {
+    this.configCache.clear();
+    console.log('所有配置已重置为默认值');
+  }
+}
