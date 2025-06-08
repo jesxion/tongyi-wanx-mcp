@@ -19,7 +19,12 @@
 - **丰富示例**: 提供大量实用的提示词模板和最佳实践
 
 ### 🏗️ 企业级架构设计
-- **模块化设计**: 9个专门模块，职责清晰，易于维护和扩展
+- **分层架构**: 采用现代化四层架构，代码组织清晰，职责分离
+  - Core层：核心业务逻辑，独立于外部依赖
+  - Features层：按功能模块组织，支持独立开发和测试
+  - Handlers层：统一处理外部请求，协调各层交互
+  - Infrastructure层：提供通用服务和基础设施
+- **模块化设计**: 15个专门模块，每个模块职责清晰，易于维护和扩展
 - **并发控制**: 智能请求队列，防止API限制，支持最大2个并发请求
 - **错误恢复**: 指数退避重试机制，自动处理临时故障
 - **性能监控**: 详细的性能指标和API调用统计
@@ -124,24 +129,62 @@ npm test
 
 ## 📋 项目结构
 
+采用现代化分层架构设计，代码组织清晰，便于维护和扩展：
+
 ```
 tongyi-wanx-mcp/
-├── src/                    # 源代码目录
-│   ├── index.ts           # 主服务器文件 - MCP协议处理
-│   ├── config.ts          # 配置管理模块 - 环境变量验证
-│   ├── logger.ts          # 日志系统模块 - 支持OSS上传
-│   ├── errors.ts          # 错误处理模块 - 自定义错误类型
-│   ├── concurrency.ts     # 并发控制模块 - 请求队列管理
-│   ├── image-storage.ts   # 图片存储模块 - 支持条件本地存储
-│   ├── oss-service.ts     # OSS服务模块 - 阿里云存储集成
-│   ├── prompt-guides.ts   # 提示词指南模块 - 智能优化系统
-│   └── tongyi-service.ts  # 通义万相服务模块 - API封装
-├── dist/                  # 编译输出目录
-├── generated_images/      # 生成图片存储目录（可选）
-├── .env.example          # 环境变量配置示例
-├── package.json          # 项目配置
-└── tsconfig.json         # TypeScript配置
+├── src/                          # 源代码目录
+│   ├── index.ts                 # 主服务器入口 - MCP协议处理和服务启动
+│   │
+│   ├── core/                    # 核心业务层
+│   │   ├── services/            # 业务服务
+│   │   │   └── tongyi-service.ts    # 通义万相API封装
+│   │   └── storage/             # 存储服务
+│   │       ├── image-storage.ts     # 图片本地存储管理
+│   │       └── oss-service.ts       # 阿里云OSS服务
+│   │
+│   ├── features/                # 功能模块层
+│   │   ├── batch/               # 批处理功能
+│   │   │   └── batch-operation-manager.ts  # 批量操作管理
+│   │   ├── prompt/              # 提示词功能
+│   │   │   ├── prompt-guides.ts     # 提示词指南和优化
+│   │   │   └── prompt-optimizer.ts # 智能提示词优化器
+│   │   ├── versioning/          # 版本管理功能
+│   │   │   └── image-version-manager.ts    # 图片版本管理
+│   │   └── workflow/            # 工作流功能
+│   │       └── workflow-manager.ts         # 工作流管理器
+│   │
+│   ├── handlers/                # 处理器层
+│   │   ├── tool-handlers.ts     # MCP工具处理器
+│   │   └── tool-manager.ts      # 工具管理器
+│   │
+│   └── infrastructure/          # 基础设施层
+│       ├── config.ts            # 配置管理 - 环境变量验证
+│       ├── logger.ts            # 日志系统 - 支持OSS上传
+│       ├── errors.ts            # 错误处理 - 自定义错误类型
+│       ├── concurrency.ts       # 并发控制 - 请求队列管理
+│       └── cache-manager.ts     # 缓存管理 - 智能缓存策略
+│
+├── dist/                        # 编译输出目录
+├── generated_images/            # 生成图片存储目录（可选）
+├── .env.example                # 环境变量配置示例
+├── package.json                # 项目配置
+└── tsconfig.json               # TypeScript配置
 ```
+
+### 🏗️ 架构设计原则
+
+#### 分层架构优势
+1. **核心层 (Core)**: 包含核心业务逻辑，独立于外部系统
+2. **功能层 (Features)**: 按业务功能组织，职责清晰
+3. **处理器层 (Handlers)**: 处理外部请求，协调各层交互
+4. **基础设施层 (Infrastructure)**: 提供通用服务和工具
+
+#### 模块化设计
+- 每个模块都有明确的职责边界
+- 通过 `index.ts` 文件统一导出接口
+- 支持独立测试和部署
+- 便于功能扩展和维护
 
 ## 🛠️ 可用工具
 
@@ -729,11 +772,23 @@ npm test
 - ✅ **增强的资源发现**: 支持本地和 OSS 图片资源自动发现
 - ✅ **优雅关闭**: 异步清理日志和服务资源
 
+#### 架构重构 - 2024年6月最新更新
+- ✅ **分层架构设计**: 采用现代化的四层架构模式
+  - **Core层**: 核心业务逻辑（services, storage）
+  - **Features层**: 功能模块（batch, prompt, versioning, workflow）  
+  - **Handlers层**: 请求处理器（tool-handlers, tool-manager）
+  - **Infrastructure层**: 基础设施（config, logger, cache, errors）
+- ✅ **模块化重构**: 所有文件按功能重新组织，提高代码可维护性
+- ✅ **TypeScript 优化**: 修复所有编译错误，实现0错误编译
+- ✅ **导入路径优化**: 统一使用相对路径，支持模块独立导入
+- ✅ **代码质量提升**: 解决未使用变量警告，优化代码结构
+
 #### 优化改进
 - ✅ **存储策略优化**: 支持纯本地、纯OSS、混合存储三种模式
 - ✅ **错误处理增强**: OSS 操作失败时优雅降级
 - ✅ **性能优化**: 日志缓冲机制减少 OSS 请求频率
 - ✅ **向后兼容**: 完全兼容现有本地存储功能
+- ✅ **开发体验**: 更清晰的项目结构，便于新开发者理解和贡献
 
 ### v2.1.0 - 图像编辑功能
 - ✅ 新增 10种图像编辑功能
