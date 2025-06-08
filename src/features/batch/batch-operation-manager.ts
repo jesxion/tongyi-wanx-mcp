@@ -3,11 +3,10 @@
  * 提供批量图片生成、批量处理和批量管理功能
  */
 
-import { Logger } from './logger.js';
-import { TongyiWanxService } from './tongyi-service.js';
-import { ImageStorage } from './image-storage.js';
-import { ImageVersionManager } from './image-version-manager.js';
-import { PromptOptimizer } from './prompt-optimizer.js';
+import { Logger } from '../../infrastructure/index.js';
+import { TongyiWanxService, ImageStorage } from '../../core/index.js';
+import { ImageVersionManager } from '../versioning/index.js';
+import { PromptOptimizer } from '../prompt/index.js';
 
 export interface BatchGenerationTask {
   id: string;

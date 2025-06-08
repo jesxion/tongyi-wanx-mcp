@@ -3,8 +3,8 @@
  * 提供提示词分析、优化建议和自动增强功能
  */
 
-import { globalCache, CacheKeyGenerator } from './cache-manager.js';
-import { Logger } from './logger.js';
+import { globalCache, CacheKeyGenerator } from '../../infrastructure/cache-manager.js';
+import { Logger } from '../../infrastructure/logger.js';
 
 export interface PromptAnalysis {
   components: {

@@ -9,9 +9,7 @@ import {
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { pipeline } from 'stream/promises';
-import { Config } from './config.js';
-import { Logger } from './logger.js';
-import { TongyiError } from './errors.js';
+import { Config, Logger, TongyiError } from '../../infrastructure/index.js';
 import { OSSService } from './oss-service.js';
 
 /**

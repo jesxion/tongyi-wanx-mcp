@@ -1,7 +1,5 @@
 import OSS from 'ali-oss';
-import { Config } from './config.js';
-import { Logger } from './logger.js';
-import { TongyiError } from './errors.js';
+import { Config, Logger, TongyiError } from '../../infrastructure/index.js';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import fetch from 'node-fetch';

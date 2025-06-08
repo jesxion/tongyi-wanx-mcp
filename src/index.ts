@@ -17,12 +17,11 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
-// 导入优化后的模块
-import { Config } from './config.js';
-import { Logger } from './logger.js';
-import { TongyiError } from './errors.js';
-import { ImageStorage, StoredImage } from './image-storage.js';
+// 导入优化后的模块 - 使用新的分层结构
+import { Config, Logger, TongyiError } from './infrastructure/index.js';
 import { 
+  ImageStorage, 
+  StoredImage,
   TongyiWanxService, 
   TextToImageSchema, 
   ImageEditSchema,
@@ -31,17 +30,15 @@ import {
   SUPPORTED_IMAGE_EDIT_MODELS,
   IMAGE_EDIT_FUNCTIONS,
   TASK_STATUS 
-} from './tongyi-service.js';
+} from './core/index.js';
 import { 
   promptGuides, 
   getPromptGuideByCategory,
-  isValidCategory 
-} from './prompt-guides.js';
-
-// 导入新的高级功能模块
-import { PromptOptimizer } from './prompt-optimizer.js';
-import { ImageVersionManager } from './image-version-manager.js';
-import { BatchOperationManager } from './batch-operation-manager.js';
+  isValidCategory,
+  PromptOptimizer,
+  ImageVersionManager,
+  BatchOperationManager
+} from './features/index.js';
 
 // 验证和初始化配置
 try {
@@ -918,7 +915,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
         }
       }      case "get_oss_status": {
         // 需要先导入 OSS 服务
-        const { OSSService } = await import('./oss-service.js');
+        const { OSSService } = await import('./core/storage/oss-service.js');
         const ossService = new OSSService();
         const status = ossService.getStatus();
         
@@ -1009,9 +1006,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
             prefix?: string; 
             max_results?: number; 
           };
-          
-          // 导入 OSS 服务
-          const { OSSService } = await import('./oss-service.js');
+            // 导入 OSS 服务
+          const { OSSService } = await import('./core/storage/oss-service.js');
           const ossService = new OSSService();
           
           if (!ossService.isAvailable()) {
@@ -1883,11 +1879,10 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
       ossAvailable: !!image.ossInfo?.url
     }
   }));
-
   // 尝试获取 OSS 中的额外图片资源
   let ossResources: any[] = [];
   try {
-    const { OSSService } = await import('./oss-service.js');
+    const { OSSService } = await import('./core/storage/oss-service.js');
     const ossService = new OSSService();
     
     if (ossService.isAvailable()) {
@@ -1932,12 +1927,11 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 // 注册资源读取
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   Logger.debug(`处理资源读取请求: ${request.params.uri}`);
-  
-  // 检查是否是 OSS 资源
+    // 检查是否是 OSS 资源
   if (request.params.uri.startsWith('oss://images/')) {
     try {
       const ossPath = request.params.uri.replace('oss://images/', '');
-      const { OSSService } = await import('./oss-service.js');
+      const { OSSService } = await import('./core/storage/oss-service.js');
       const ossService = new OSSService();
       
       if (!ossService.isAvailable()) {

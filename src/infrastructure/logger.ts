@@ -51,9 +51,8 @@ export class Logger {
    * 初始化 OSS 日志存储
    */
   static async initOSSLogging(): Promise<void> {
-    try {
-      // 动态导入 OSSService 以避免循环依赖
-      const { OSSService } = await import('./oss-service.js');
+    try {      // 动态导入 OSSService 以避免循环依赖
+      const { OSSService } = await import('../core/storage/oss-service.js');
       this.ossService = new OSSService();
       
       if (this.ossService.isAvailable()) {

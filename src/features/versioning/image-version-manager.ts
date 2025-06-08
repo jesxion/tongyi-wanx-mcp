@@ -3,7 +3,7 @@
  * 提供图片版本控制、变体生成和历史记录功能
  */
 
-import { Logger } from './logger.js';
+import { Logger } from '../../infrastructure/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

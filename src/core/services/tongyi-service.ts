@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import { Config } from './config.js';
-import { Logger } from './logger.js';
-import { TongyiError, ErrorHandler, CircuitBreaker } from './errors.js';
-import { ConcurrencyManager, withPerformanceMonitoring, RequestPriority } from './concurrency.js';
+import { Config, Logger, TongyiError, ErrorHandler, CircuitBreaker, ConcurrencyManager, withPerformanceMonitoring, RequestPriority } from '../../infrastructure/index.js';
 
 // 支持的模型
 export const SUPPORTED_MODELS = [

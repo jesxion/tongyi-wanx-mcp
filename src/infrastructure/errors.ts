@@ -4,7 +4,7 @@ import { Logger } from './logger.js';
 /**
  * 熔断器状态枚举
  */
-enum CircuitBreakerState {
+export enum CircuitBreakerState {
   CLOSED = 'CLOSED',
   OPEN = 'OPEN',
   HALF_OPEN = 'HALF_OPEN'
