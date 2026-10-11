@@ -1,5 +1,7 @@
 # 通义万相 MCP 服务器 v2.3.0
 
+> **维护状态**：本项目自 2025-06 起不再积极维护，不保证跟进通义万相 API 与 MCP SDK 的后续变更。欢迎 fork；使用前请自行核对所用模型名称与接口参数是否仍然有效。
+
 一个功能全面的 Model Context Protocol (MCP) 服务器，为 Claude Desktop 等 MCP 客户端提供强大的 AI 图像生成和编辑功能。基于阿里云通义万相模型，支持文本生成图像、图像编辑、智能提示词优化、OSS 云存储等核心功能。
 
 ## ✨ 核心特性
@@ -31,7 +33,7 @@
 - **优雅关闭**: 完善的资源清理和服务关闭流程
 
 ### 💾 智能存储管理 (v2.3.0 新特性)
-- **条件本地存储**: 仅在配置 IMAGES_DIR 时启用本地存储，灵活适应不同部署需求
+- **本地存储**: 必须配置 IMAGES_DIR（启动时校验，缺失会直接报错退出），图片与元数据保存在该目录
 - **阿里云 OSS 集成**: 可选的云端存储，提供永久访问链接和自动日志上传
 - **智能 URL 选择**: 优先使用 OSS URL，自动回退到本地路径
 - **用户图片上传**: 支持上传本地图片到 OSS 获取公网 URL
@@ -76,7 +78,7 @@ cp .env.example .env
 
 #### 必需的环境变量
 
-**图片存储目录（推荐配置）:**
+**图片存储目录（必填）:**
 ```bash
 # Windows
 IMAGES_DIR=C:\path\to\your\images\directory
@@ -120,12 +122,19 @@ npm run dev
 
 ### 5. 验证安装
 
+项目没有 `npm test` 脚本。可以用测试模式验证服务能正常启动（无需 API 密钥，但 `IMAGES_DIR` 必须设置）：
+
 ```bash
-# 运行测试（测试模式，无需API密钥）
-npm test
+npm run build
+
+# Linux / macOS
+IMAGES_DIR=./generated_images ALLOW_TEST_MODE=true npm start
+
+# Windows (PowerShell)
+$env:IMAGES_DIR="./generated_images"; $env:ALLOW_TEST_MODE="true"; npm start
 ```
 
-如果看到 "🎉 所有测试完成！" 说明安装成功。
+日志中出现 `测试模式: 启用` 即说明安装成功。服务通过 stdio 与 MCP 客户端通信，直接运行时会等待客户端输入，按 `Ctrl+C` 退出。接入 MCP 客户端后应能列出 26 个工具。
 
 ## 📋 项目结构
 
@@ -166,7 +175,7 @@ tongyi-wanx-mcp/
 │       └── cache-manager.ts     # 缓存管理 - 智能缓存策略
 │
 ├── dist/                        # 编译输出目录
-├── generated_images/            # 生成图片存储目录（可选）
+├── generated_images/            # 生成图片存储目录（默认示例目录，实际路径由 IMAGES_DIR 决定）
 ├── .env.example                # 环境变量配置示例
 ├── package.json                # 项目配置
 └── tsconfig.json               # TypeScript配置
@@ -450,7 +459,7 @@ style-examples-chinese-ink   # 国风水墨风格示例
 ### 环境变量配置
 
 #### 基础配置
-- `IMAGES_DIR`: 图片存储路径 (可选，不配置则不启用本地存储)
+- `IMAGES_DIR`: 图片存储路径 (**必填**，不存在会自动创建；未设置时服务启动失败)
 - `DASHSCOPE_API_KEY`: 通义万相API密钥 (可选，测试模式无需)
 - `LOG_LEVEL`: 日志级别 (DEBUG, INFO, ERROR，默认: INFO)
 - `MAX_CONCURRENT_REQUESTS`: 最大并发请求数 (默认: 2)
@@ -660,13 +669,9 @@ your-bucket/
 - 适用于个人使用、测试环境
 - 配置 IMAGES_DIR，不配置 OSS
 
-仅 OSS 存储：
-- 适用于生产环境、多用户场景
-- 不配置 IMAGES_DIR，配置 OSS
-
-混合存储：
-- 适用于逐步迁移、备份需求
-- 同时配置 IMAGES_DIR 和 OSS
+本地 + OSS 存储：
+- 适用于生产环境、多用户场景、备份需求
+- 同时配置 IMAGES_DIR 和 OSS（IMAGES_DIR 始终必填，OSS 为可选增强）
 ```
 
 #### 2. OSS 配置建议
@@ -749,21 +754,16 @@ A:
 - 验证权限配置
 
 #### 测试模式使用
-无API密钥时的功能测试：
+无API密钥时的功能测试：在环境变量（或 `.env`）中设置 `ALLOW_TEST_MODE=true` 并留空 `DASHSCOPE_API_KEY`（`IMAGES_DIR` 仍需设置），再启动服务：
 ```bash
-# 启动测试模式
-npm test
-
-# 测试功能包括：
-# - 提示词优化
-# - 风格指南获取  
-# - 服务状态查询
-# - 工具列表获取
+IMAGES_DIR=./generated_images ALLOW_TEST_MODE=true npm start
 ```
+
+测试模式下图像生成和编辑返回模拟结果，不会调用真实 API。提示词优化、风格指南获取、服务状态查询、工具列表获取等不依赖 API 的功能可正常使用。
 
 ## 📊 版本更新历史
 
-### v2.3.0 (当前版本) - 2024年6月
+### v2.3.0 (当前版本) - 2025年6月
 #### 新增功能
 - ✅ **条件本地存储**: 仅在配置 IMAGES_DIR 时启用本地存储
 - ✅ **OSS 云存储集成**: 完整的阿里云 OSS 支持，包括图片和日志存储
